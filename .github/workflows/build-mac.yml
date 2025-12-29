@@ -41,7 +41,7 @@ jobs:
             --onefile \
             --name "SuperLauncherMC" \
             --add-data "assets:assets" \
-            SuperLauncherMC.py
+            SuperLauncher.py
 
       - name: Package .app into zip
         run: |
