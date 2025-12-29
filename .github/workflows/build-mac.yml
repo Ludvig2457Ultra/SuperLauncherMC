@@ -33,13 +33,15 @@ jobs:
                       minecraft-launcher-lib packaging cryptography \
                       PyJWT Pillow psutil pyinstaller
 
-      - name: Build SuperLauncherMC .app
+      - name: Build SuperLauncherMC .app (onefile)
         run: |
           pyinstaller \
             --noconsole \
             --windowed \
+            --onefile \
             --name "SuperLauncherMC" \
-            SuperLauncher.py
+            --add-data "assets:assets" \
+            SuperLauncherMC.py
 
       - name: Package .app into zip
         run: |
