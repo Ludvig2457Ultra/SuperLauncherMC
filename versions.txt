@@ -1,1 +1,3 @@
+v2.0.0=https://github.com/Ludvig2457Ultra/SuperLauncherMC/releases/download/v2.0.0/superlauncher.exe
+v1.4.0.9=https://github.com/Ludvig2457Ultra/SuperLauncherMC/releases/download/v1.4.0.9/SuperLauncher.exe
 v1.4.0.7=https://github.com/ludvig2457/SuperLauncher/releases/download/v1.4.0.7/SuperLauncher1.4.0.7.exe
