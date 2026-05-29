@@ -46,6 +46,10 @@ except ImportError:
 from minecraft_launcher_lib.utils import get_minecraft_directory, get_version_list
 from minecraft_launcher_lib.install import install_minecraft_version
 from minecraft_launcher_lib.command import get_minecraft_command
+from minecraft_launcher_lib import fabric as fabric_loader
+from minecraft_launcher_lib import forge as forge_loader
+from minecraft_launcher_lib import quilt as quilt_loader
+# neoforge пока недоступен в этой версии minecraft_launcher_lib
 
 # =========== PYQT6 ИМПОРТЫ ===========
 
@@ -69,7 +73,7 @@ from PyQt6.QtWidgets import (
     QLineEdit, QComboBox, QProgressBar, QSpacerItem, QSizePolicy,
     QMessageBox, QScrollArea, QDialog, QCheckBox, QFormLayout,
     QListWidget, QListWidgetItem, QRadioButton, QFileDialog,
-    QGridLayout, QGroupBox, QTabWidget
+    QGridLayout, QGroupBox, QTabWidget, QProgressDialog
 )
 
 # PyQt6 GUI - ОСНОВНЫЕ
@@ -230,7 +234,7 @@ if not os.path.isfile(profile_path):
 
 # Создаем папки
 folders = [
-    "assets/holiday", "assets/skins", "assets/themes", "assets/icons",
+    "assets/skins", "assets/icons",
     "user_data", "servers", "builds", "mods_cache", "logs", "temp"
 ]
 
@@ -258,6 +262,8 @@ translations = {
         "Browse Java path": "Выбрать путь к Java",
         "Page backgrounds:": "Фоны страниц:",
         "Save settings": "Сохранить настройки",
+        "RAM allocation:": "Выделение ОЗУ:",
+        "JVM arguments:": "JVM аргументы:",
 
         # --- MinecraftPage ---
         "Play": "Играть",
@@ -265,7 +271,10 @@ translations = {
         "No versions available": "Версии недоступны",
 
         # --- ModsPage ---
-        "Mods from Modrinth": "Моды из Modrinth",
+        "Mods from": "Моды из",
+        "Modrinth": "Modrinth",
+        "CurseForge": "CurseForge",
+        "Select file:": "Выберите файл:",
         "Search mod...": "Найти мод...",
         "Open mods folder": "Открыть папку модов",
         "Delete all mods": "Удалить все моды",
@@ -338,6 +347,33 @@ translations = {
         "Core": "Ядро",
         "Create": "Создать",
         "Please enter a valid server name and port (number).": "Пожалуйста, введите корректное имя и порт (число).",
+        "RAM (GB):": "ОЗУ (ГБ):",
+        "Console": "Консоль",
+        "Plugins": "Плагины",
+        "Backup": "Бэкап",
+        "Search": "Поиск",
+        "Install": "Установить",
+        "Uninstall": "Удалить",
+        "Open folder": "Открыть папку",
+        "Server console": "Консоль сервера",
+        "Enter command...": "Введите команду...",
+        "Send": "Отправить",
+        "Online mode": "Online-mode",
+        "Offline mode": "Оффлайн режим",
+        "Max players": "Макс. игроков",
+        "MOTD": "MOTD",
+        "Create Backup": "Создать бэкап",
+        "Restore": "Восстановить",
+        "Backup created": "Бэкап создан",
+        "Backup restored": "Бэкап восстановлен",
+        "Downloading plugin...": "Загрузка плагина...",
+        "Plugin installed": "Плагин установлен",
+        "Search plugins...": "Поиск плагинов...",
+        "No plugins found": "Плагины не найдены",
+        "Backups": "Бэкапы",
+        "Restore backup": "Восстановить бэкап",
+        "Are you sure?": "Вы уверены?",
+        "Install plugin": "Установка плагина",
         "Error": "Ошибка"
     },
 
@@ -352,6 +388,8 @@ translations = {
         "Browse Java path": "Browse Java path",
         "Page backgrounds:": "Page backgrounds:",
         "Save settings": "Save settings",
+        "RAM allocation:": "RAM allocation:",
+        "JVM arguments:": "JVM arguments:",
 
         # --- MinecraftPage ---
         "Play": "Play",
@@ -359,7 +397,10 @@ translations = {
         "No versions available": "No versions available",
 
         # --- ModsPage ---
-        "Mods from Modrinth": "Mods from Modrinth",
+        "Mods from": "Mods from",
+        "Modrinth": "Modrinth",
+        "CurseForge": "CurseForge",
+        "Select file:": "Select file:",
         "Search mod...": "Search mod...",
         "Open mods folder": "Open mods folder",
         "Delete all mods": "Delete all mods",
@@ -432,6 +473,33 @@ translations = {
         "Core": "Core",
         "Create": "Create",
         "Please enter a valid server name and port (number).": "Please enter a valid server name and port (number).",
+        "RAM (GB):": "RAM (GB):",
+        "Console": "Console",
+        "Plugins": "Plugins",
+        "Backup": "Backup",
+        "Search": "Search",
+        "Install": "Install",
+        "Uninstall": "Uninstall",
+        "Open folder": "Open folder",
+        "Server console": "Server console",
+        "Enter command...": "Enter command...",
+        "Send": "Send",
+        "Online mode": "Online mode",
+        "Offline mode": "Offline mode",
+        "Max players": "Max players",
+        "MOTD": "MOTD",
+        "Create Backup": "Create Backup",
+        "Restore": "Restore",
+        "Backup created": "Backup created",
+        "Backup restored": "Backup restored",
+        "Downloading plugin...": "Downloading plugin...",
+        "Plugin installed": "Plugin installed",
+        "Search plugins...": "Search plugins...",
+        "No plugins found": "No plugins found",
+        "Backups": "Backups",
+        "Restore backup": "Restore backup",
+        "Are you sure?": "Are you sure?",
+        "Install plugin": "Install plugin",
         "Error": "Error"
     }
 }
@@ -448,9 +516,12 @@ def load_config():
     return {
         "java_path": "",
         "ram": 4096,
+        "max_ram": 4096,
+        "jvm_args": "",
         "language": "ru",
         "theme": "dark",
-        "launch_mode": "launcher_lib"
+        "launch_mode": "launcher_lib",
+        "curseforge_api_key": ""
     }
 
 
@@ -463,6 +534,19 @@ def save_config(config):
 
 
 MODRINTH_API = "https://api.modrinth.com/v2"
+CURSEFORGE_API = "https://api.curseforge.com/v1"
+
+_cf_api_key_cache = None
+def get_cf_api_key():
+    global _cf_api_key_cache
+    if _cf_api_key_cache is None:
+        cfg = load_config()
+        _cf_api_key_cache = cfg.get("curseforge_api_key", "")
+    return _cf_api_key_cache
+
+def invalidate_cf_api_key_cache():
+    global _cf_api_key_cache
+    _cf_api_key_cache = None
 
 # Путь к папке Minecraft
 minecraft_directory = get_minecraft_directory()
@@ -490,133 +574,7 @@ if not os.path.isfile(profile_path):
 else:
     print("launcher_profiles.json already exists")
 
-class HolidayTheme:
-    def __init__(self):
-        self.current_holiday = self.detect_holiday()
-        self.snowflakes = []
-        self.snow_timer = None
-        
-    def detect_holiday(self):
-        """Определение текущего праздника"""
-        now = datetime.datetime.now()
-        month, day = now.month, now.day
-        
-        if month == 12 and 20 <= day <= 31:
-            return "christmas"
-        elif month == 1 and 1 <= day <= 15:
-            return "new_year"
-        elif month == 12 and 15 <= day <= 31:
-            return "new_year_eve"
-        return None
-    
-    def get_holiday_assets(self):
-        """Получение ресурсов для праздника"""
-        if self.current_holiday in ["christmas", "new_year", "new_year_eve"]:
-            return {
-                "name": self.current_holiday,
-                "background": "assets/holiday/new_year_bg.png",
-                "icons": {
-                    "home": "🎄",
-                    "mods": "🎁",
-                    "news": "❄️",
-                    "updates": "🌟",
-                    "servers": "🦌",
-                    "settings": "🔔",
-                    "minecraft": "⛄",
-                    "account": "🎅",
-                    "gifts": "🎁"
-                },
-                "colors": {
-                    "primary": "#FF3333",    # Красный
-                    "secondary": "#33FF57",   # Зеленый
-                    "accent": "#FFD700",      # Золотой
-                    "background": "#0A2E36"   # Темно-синий
-                },
-                "music": "assets/holiday/christmas_music.mp3",
-                "sounds": {
-                    "click": "assets/holiday/bell.wav",
-                    "success": "assets/holiday/success.wav"
-                }
-            }
-        return None
-    
-    def apply_holiday_style(self, widget):
-        """Применить праздничные стили к виджету"""
-        assets = self.get_holiday_assets()
-        if assets:
-            style = f"""
-                QWidget {{
-                    background-color: {assets['colors']['background']};
-                }}
-                QPushButton {{
-                    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                        stop:0 {assets['colors']['primary']},
-                        stop:1 {assets['colors']['secondary']});
-                    color: white;
-                    border-radius: 10px;
-                    padding: 10px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    border: 2px solid {assets['colors']['accent']};
-                }}
-                QPushButton:hover {{
-                    background-color: {assets['colors']['accent']};
-                }}
-                QLabel {{
-                    color: {assets['colors']['accent']};
-                }}
-            """
-            widget.setStyleSheet(style)
-            
-            # Добавить снежинки на главное окно
-            if isinstance(widget, QMainWindow):
-                self.setup_snow_effect(widget)
-    
-    def setup_snow_effect(self, window):
-        """Настройка эффекта снежинок"""
-        self.snowflakes = []
-        for _ in range(50):
-            self.snowflakes.append({
-                'x': secrets.randbelow(window.width()),
-                'y': secrets.randbelow(100) - 110,  # ОТ -10 ДО -110
-                'size': secrets.randbelow(15) + 10,  # ОТ 10 ДО 25
-                'speed': secrets.randbelow(4) + 1,   # ОТ 1 ДО 5
-                'wiggle': secrets.randbelow(5) - 2   # ОТ -2 ДО 2
-            })
-        
-        if not self.snow_timer:
-            self.snow_timer = QTimer()
-            self.snow_timer.timeout.connect(lambda: self.update_snow(window))
-            self.snow_timer.start(50)
-    
-    def update_snow(self, window):
-        """Обновление позиций снежинок"""
-        for flake in self.snowflakes:
-            flake['y'] += flake['speed']
-            flake['x'] += flake['wiggle']
-            
-            if flake['y'] > window.height():
-                flake['y'] = -10
-                flake['x'] = secrets.randbelow(window.width())
-            
-            if flake['x'] < 0 or flake['x'] > window.width():
-                flake['wiggle'] = -flake['wiggle']
-        
-        window.update()
-    
-    def paint_snow(self, painter, window):
-        """Отрисовка снежинок"""
-        if self.current_holiday:
-            painter.setBrush(QBrush(QColor(255, 255, 255, 200)))
-            painter.setPen(Qt.PenStyle.NoPen)
-            
-            for flake in self.snowflakes:
-                painter.drawEllipse(
-                    flake['x'], flake['y'],
-                    flake['size'], flake['size']
-                )
 
-# =========== ДОБАВИТЬ ПОСЛЕ HolidayTheme ===========
 class AccountSystem:
     def __init__(self):
         self.accounts_file = "accounts.json"
@@ -808,165 +766,7 @@ class AccountSystem:
             return f"user_data/{self.current_user['user_id']}"
         return "user_data/guest"
     
-# =========== ДОБАВИТЬ ПОСЛЕ AccountSystem ===========
-class GiftSystem:
-    def __init__(self, account_system):
-        self.account_system = account_system
-        self.gifts_file = "gifts.json"
-        self.load_gifts()
-    
-    def load_gifts(self):
-        """Загрузка подарков"""
-        try:
-            with open(self.gifts_file, "r", encoding="utf-8") as f:
-                self.gifts = json.load(f)
-        except:
-            # Базовые подарки
-            self.gifts = {
-                "daily": [
-                    {"id": "xp_100", "type": "xp", "amount": 100, "name": "Опыт новичка", "icon": "🌟"},
-                    {"id": "skin_hat", "type": "skin", "skin_id": "santa_hat", "name": "Шапка Санты", "icon": "🎅"},
-                    {"id": "theme_holiday", "type": "theme", "theme_id": "holiday", "name": "Праздничная тема", "icon": "🎄"},
-                    {"id": "resource_winter", "type": "resource_pack", "pack_id": "winter", "name": "Зимний набор", "icon": "❄️"}
-                ],
-                "special": [
-                    {"id": "new_year_2026", "type": "premium", "days": 7, "name": "Премиум на неделю", "icon": "🎉",
-                     "available": "2026-01-01"},
-                    {"id": "christmas_suit", "type": "skin", "skin_id": "santa_suit", "name": "Костюм Санты", "icon": "🎅",
-                     "available": "2025-12-25"}
-                ],
-                "level_up": [
-                    {"level": 5, "gift": {"type": "skin", "skin_id": "epic", "name": "Эпический скин"}},
-                    {"level": 10, "gift": {"type": "theme", "theme_id": "premium", "name": "Премиум тема"}},
-                    {"level": 20, "gift": {"type": "license", "tier": "standard", "days": 30, "name": "Месяц Standard"}}
-                ]
-            }
-            self.save_gifts()
-    
-    def save_gifts(self):
-        """Сохранение подарков"""
-        with open(self.gifts_file, "w", encoding="utf-8") as f:
-            json.dump(self.gifts, f, indent=2)
-    
-    def get_daily_gift(self):
-        """Получение ежедневного подарка"""
-        if not self.account_system.current_user:
-            return None, "Требуется вход в аккаунт"
-        
-        user = self.account_system.current_user
-        today = datetime.date.today().isoformat()
-        
-        # Проверяем, получал ли сегодня
-        claimed = user.get("gifts_claimed", [])
-        for gift in claimed:
-            if gift.get("date") == today:
-                return None, "Сегодняшний подарок уже получен"
-        
-        # Выбираем случайный подарок
-        import random
-        available_gifts = []
-        
-        for gift in self.gifts["daily"]:
-            available_gifts.append(gift)
-        
-        # Добавляем специальные подарки если доступны
-        for gift in self.gifts["special"]:
-            if gift.get("available"):
-                available_date = datetime.date.fromisoformat(gift["available"])
-                if datetime.date.today() == available_date:
-                    available_gifts.append(gift)
-        
-        if not available_gifts:
-            return None, "Нет доступных подарков"
-        
-        selected_gift = random.choice(available_gifts)
-        
-        # Применяем подарок
-        self.apply_gift(selected_gift, user)
-        
-        # Сохраняем факт получения
-        claimed.append({
-            "date": today,
-            "gift_id": selected_gift["id"],
-            "gift_name": selected_gift["name"]
-        })
-        user["gifts_claimed"] = claimed
-        
-        # Сохраняем пользователя
-        self.account_system.save_accounts(
-            self.account_system.load_accounts()  # Нужно обновить в общем списке
-        )
-        
-        return selected_gift, "Подарок получен!"
-    
-    def apply_gift(self, gift, user):
-        """Применение подарка"""
-        gift_type = gift["type"]
-        
-        if gift_type == "xp":
-            user["xp"] = user.get("xp", 0) + gift["amount"]
-            self.check_level_up(user)
-        
-        elif gift_type == "skin":
-            skins = user.get("skins", ["default"])
-            if gift["skin_id"] not in skins:
-                skins.append(gift["skin_id"])
-                user["skins"] = skins
-        
-        elif gift_type == "theme":
-            # Добавить тему
-            pass
-        
-        elif gift_type == "license":
-            # Активировать лицензию
-            license_key = self.account_system.generate_license_key(
-                user["user_id"],
-                gift.get("tier", "standard"),
-                gift.get("days", 30)
-            )
-            self.account_system.activate_license(license_key, user["user_id"])
-    
-    def check_level_up(self, user):
-        """Проверка повышения уровня"""
-        xp_needed = user["level"] * 1000
-        current_xp = user.get("xp", 0)
-        
-        while current_xp >= xp_needed:
-            user["level"] += 1
-            current_xp -= xp_needed
-            xp_needed = user["level"] * 1000
-            
-            # Дарим подарок за уровень
-            self.give_level_up_gift(user["level"], user)
-        
-        user["xp"] = current_xp
-    
-    def give_level_up_gift(self, level, user):
-        """Выдача подарка за уровень"""
-        for level_gift in self.gifts["level_up"]:
-            if level_gift["level"] == level:
-                self.apply_gift(level_gift["gift"], user)
-                return level_gift["gift"]
-        return None
-    
-    def get_available_gifts(self):
-        """Получение списка доступных подарков"""
-        available = []
-        today = datetime.date.today()
-        
-        # Ежедневные подарки
-        available.extend(self.gifts["daily"])
-        
-        # Специальные подарки
-        for gift in self.gifts["special"]:
-            if gift.get("available"):
-                gift_date = datetime.date.fromisoformat(gift["available"])
-                if gift_date == today:
-                    available.append(gift)
-        
-        return available
-    
-# =========== ДОБАВИТЬ ПОСЛЕ GiftSystem ===========
+
 class CustomizableUI:
     def __init__(self):
         self.settings_file = "ui_settings.json"
@@ -986,8 +786,6 @@ class CustomizableUI:
                 "gradient_start": "#1a1a2e",
                 "gradient_end": "#16213e",
                 "animations": True,
-                "particles": True,
-                "snow_effect": True,
                 "font_size": 14,
                 "font_family": "Segoe UI",
                 "rounded_corners": True,
@@ -1030,13 +828,6 @@ class CustomizableUI:
                 "fg": "#333333",
                 "accent": self.settings["accent_color"],
                 "border": "#dddddd"
-            }
-        else:  # holiday
-            base_colors = {
-                "bg": "#0A2E36",
-                "fg": "#FFFFFF",
-                "accent": "#FFD700",
-                "border": "#1B4B5A"
             }
         
         border_radius = "15px" if self.settings["rounded_corners"] else "5px"
@@ -1147,20 +938,6 @@ class CustomizableUI:
                 "accent_color": "#4facfe",
                 "gradient_start": "#1a1a2e",
                 "gradient_end": "#16213e"
-            },
-            "new_year_2026": {
-                "theme": "holiday",
-                "accent_color": "#FFD700",
-                "gradient_start": "#0A2E36",
-                "gradient_end": "#1B4B5A",
-                "snow_effect": True
-            },
-            "christmas": {
-                "theme": "holiday",
-                "accent_color": "#FF3333",
-                "gradient_start": "#1A3C27",
-                "gradient_end": "#0D2818",
-                "snow_effect": True
             },
             "light_modern": {
                 "theme": "light",
@@ -1363,270 +1140,661 @@ class BuildsManager:
         self.modrinth_api = "https://api.modrinth.com/v2"
         self.curseforge_api = "https://api.curseforge.com/v1"
         self.modpacks_cache = {}
-        
-    def search_modpacks(self, query="", minecraft_version="", loader="", limit=20):
-        """Поиск сборок на Modrinth"""
+
+    def search_modrinth(self, query="", limit=20):
         try:
             params = {
                 "limit": limit,
-                "index": "relevance",
+                "index": "downloads",
                 "facets": '[["project_type:modpack"]]'
             }
-            
             if query:
                 params["query"] = query
-            
-            # Добавляем версии и лоадеры в facets
-            facets = []
-            if minecraft_version:
-                facets.append(f'["versions:{minecraft_version}"]')
-            if loader:
-                facets.append(f'["categories:{loader}"]')
-            
-            if facets:
-                params["facets"] = f'[{",".join(facets)}]'
-            
-            url = f"{self.modrinth_api}/search"
-            response = requests.get(url, params=params)
-            data = response.json()
-            
+            resp = requests.get(f"{self.modrinth_api}/search", params=params, timeout=15,
+                                headers={"User-Agent": "SuperLauncher/2.0"})
+            data = resp.json()
             modpacks = []
-            for hit in data["hits"]:
+            for hit in data.get("hits", []):
                 modpacks.append({
-                    "id": hit["project_id"],
-                    "slug": hit.get("slug"),
-                    "name": hit["title"],
-                    "description": hit.get("description", ""),
-                    "icon_url": hit.get("icon_url"),
-                    "downloads": hit.get("downloads", 0),
-                    "follows": hit.get("follows", 0),
+                    "id": hit["project_id"], "slug": hit.get("slug"),
+                    "name": hit["title"], "description": hit.get("description", ""),
+                    "icon_url": hit.get("icon_url"), "downloads": hit.get("downloads", 0),
                     "author": hit.get("author", "Unknown"),
-                    "versions": hit.get("versions", []),
-                    "loaders": hit.get("loaders", []),
+                    "versions": hit.get("versions", []), "loaders": hit.get("loaders", []),
                     "source": "modrinth"
                 })
-            
             return modpacks
-            
         except Exception as e:
-            print(f"Ошибка поиска сборок: {e}")
+            print(f"Modrinth search error: {e}")
             return []
-    
-    def get_modpack_versions(self, project_id):
-        """Получение версий сборки"""
+
+    def search_curseforge(self, query="", limit=30):
         try:
-            url = f"{self.modrinth_api}/project/{project_id}/version"
-            response = requests.get(url)
-            return response.json()
-        except:
-            return []
-    
-    def download_modpack(self, version_id, install_path):
-        """Скачивание и установка сборки"""
-        try:
-            # Получаем информацию о версии
-            version_url = f"{self.modrinth_api}/version/{version_id}"
-            version_data = requests.get(version_url).json()
-            
-            # Создаем папку для сборки
-            pack_name = version_data["name"]
-            pack_folder = os.path.join(install_path, pack_name)
-            os.makedirs(pack_folder, exist_ok=True)
-            
-            # Скачиваем файлы
-            files = version_data["files"]
-            for file in files:
-                if file["primary"]:
-                    # Основной файл (обычно .mrpack)
-                    download_url = file["url"]
-                    filename = file["filename"]
-                    filepath = os.path.join(pack_folder, filename)
-                    
-                    self.download_file(download_url, filepath)
-                    
-                    # Если это .mrpack файл, распаковываем
-                    if filename.endswith(".mrpack"):
-                        self.extract_mrpack(filepath, pack_folder)
-            
-            return pack_folder
-            
+            params = {
+                "gameId": 432, "classId": 4471, "searchFilter": query,
+                "pageSize": limit, "sortField": 2, "sortOrder": "desc"
+            }
+            resp = requests.get(f"{self.curseforge_api}/mods/search", params=params,
+                                headers={"x-api-key": get_cf_api_key(), "Accept": "application/json"}, timeout=15)
+            data = resp.json()
+            modpacks = []
+            for mod in data.get("data", []):
+                modpacks.append({
+                    "id": mod["id"], "name": mod.get("name", ""),
+                    "description": mod.get("summary", ""),
+                    "icon_url": (mod.get("logo") or {}).get("url"),
+                    "downloads": mod.get("downloadCount", 0),
+                    "author": (mod.get("authors") or [{}])[0].get("name", "Unknown") if mod.get("authors") else "Unknown",
+                    "source": "curseforge"
+                })
+            return modpacks
         except Exception as e:
-            print(f"Ошибка скачивания сборки: {e}")
+            print(f"CurseForge search error: {e}")
+            return []
+
+    def get_modpack_versions(self, project_id, source="modrinth"):
+        if source == "modrinth":
+            try:
+                resp = requests.get(f"{self.modrinth_api}/project/{project_id}/version", timeout=15,
+                                    headers={"User-Agent": "SuperLauncher/2.0"})
+                return resp.json()
+            except:
+                return []
+        else:
+            try:
+                resp = requests.get(f"{self.curseforge_api}/mods/{project_id}/files",
+                                    headers={"x-api-key": get_cf_api_key(), "Accept": "application/json"}, timeout=15)
+                data = resp.json()
+                return data.get("data", [])
+            except:
+                return []
+
+    def backup_mods(self, mc_dir):
+        mods_dir = os.path.join(mc_dir, "mods")
+        if not os.path.exists(mods_dir):
+            return
+        import time
+        backup = os.path.join(mc_dir, f"mods_backup_{int(time.time())}")
+        shutil.copytree(mods_dir, backup)
+        return backup
+
+    def restore_mods(self, mc_dir):
+        import glob, re
+        backups = sorted(glob.glob(os.path.join(mc_dir, "mods_backup_*")))
+        if not backups:
+            return False
+        backup = backups[-1]
+        mods_dir = os.path.join(mc_dir, "mods")
+        if os.path.exists(mods_dir):
+            shutil.rmtree(mods_dir, ignore_errors=True)
+        shutil.copytree(backup, mods_dir)
+        shutil.rmtree(backup, ignore_errors=True)
+        return True
+
+    def deduplicate_mods(self, mc_dir):
+        mods_dir = os.path.join(mc_dir, "mods")
+        if not os.path.isdir(mods_dir):
+            return
+        import re
+
+        def _parse_version(ver_str):
+            parts = ver_str.replace("-", ".").split(".")
+            nums = []
+            for p in parts:
+                try:
+                    nums.append(int(p))
+                except ValueError:
+                    nums.append(0)
+            return tuple(nums)
+
+        def _read_meta(path):
+            with zipfile.ZipFile(path, 'r') as z:
+                if "META-INF/mods.toml" in z.namelist():
+                    text = z.read("META-INF/mods.toml").decode("utf-8", errors="replace")
+                    m = re.search(r'^\s*modId\s*=\s*"([^"]+)"', text, re.MULTILINE)
+                    v = re.search(r'^\s*version\s*=\s*"([^"]+)"', text, re.MULTILINE)
+                    return (m.group(1), v.group(1) if v else "0") if m else None
+                if "fabric.mod.json" in z.namelist():
+                    data = json.loads(z.read("fabric.mod.json"))
+                    mid = data.get("id")
+                    return (mid, data.get("version", "0")) if mid else None
+                if "quilt.mod.json" in z.namelist():
+                    data = json.loads(z.read("quilt.mod.json"))
+                    mid = data.get("quilt_loader", {}).get("id")
+                    return (mid, data.get("version", "0") or "0") if mid else None
             return None
-    
-    def download_file(self, url, save_path):
-        """Скачивание файла"""
-        response = requests.get(url, stream=True)
-        total_size = int(response.headers.get("content-length", 0))
-        
+
+        entries = []
+        for fn in os.listdir(mods_dir):
+            if not fn.endswith(".jar"):
+                continue
+            path = os.path.join(mods_dir, fn)
+            try:
+                meta = _read_meta(path)
+                if meta:
+                    mid, ver = meta
+                    # loader_priority: 0=Forge (mods.toml), 1=Fabric, 2=Quilt
+                    with zipfile.ZipFile(path, 'r') as z:
+                        if "META-INF/mods.toml" in z.namelist():
+                            lp = 0
+                        elif "fabric.mod.json" in z.namelist():
+                            lp = 1
+                        else:
+                            lp = 2
+                    entries.append((mid, fn, path, ver, lp))
+            except Exception:
+                pass
+
+        mod_groups = {}
+        for mid, fn, path, ver, lp in entries:
+            mod_groups.setdefault(mid, []).append((fn, path, ver, lp))
+
+        removed = 0
+        for mid, group in mod_groups.items():
+            if len(group) > 1:
+                group.sort(key=lambda x: (x[3], tuple(-n for n in _parse_version(x[2]))))
+                for fn, path, ver, lp in group[1:]:
+                    try:
+                        os.remove(path)
+                        removed += 1
+                        loader_name = ["Forge", "Fabric", "Quilt"][lp]
+                        print(f"Удалён дубликат: {fn} (modId={mid}, версия={ver}, {loader_name})")
+                    except Exception:
+                        pass
+        if removed:
+            print(f"Дедупликация завершена: удалено {removed} дубликатов модов")
+
+    # Известные конфликтные Fabric-моды, которые ломают RegistryDataLoader через Sinytra Connector
+    CONFLICTING_MODS = {
+        "betterend": "BetterEnd (Fabric) — ломает загрузку регистров через Connector",
+        "bclib": "BCLib (Fabric, библиотека BetterEnd) — конфликтует с fabric-registry-sync-v0",
+        "betterendisland": "BetterEnd Island (Fabric) — зависит от BCLib",
+    }
+
+    def detect_conflicting_mods(self, mc_dir):
+        import re
+        mods_dir = os.path.join(mc_dir, "mods")
+        if not os.path.isdir(mods_dir):
+            return []
+        found = []
+        for fn in os.listdir(mods_dir):
+            if not fn.endswith(".jar"):
+                continue
+            path = os.path.join(mods_dir, fn)
+            try:
+                with zipfile.ZipFile(path, 'r') as z:
+                    if "fabric.mod.json" in z.namelist():
+                        data = json.loads(z.read("fabric.mod.json"))
+                        mid = data.get("id", "")
+                        if mid in self.CONFLICTING_MODS:
+                            found.append((fn, mid, self.CONFLICTING_MODS[mid]))
+                    elif "META-INF/mods.toml" in z.namelist():
+                        text = z.read("META-INF/mods.toml").decode("utf-8", errors="replace")
+                        m = re.search(r'^\s*modId\s*=\s*"([^"]+)"', text, re.MULTILINE)
+                        if m:
+                            mid = m.group(1)
+                            if mid in self.CONFLICTING_MODS:
+                                found.append((fn, mid, self.CONFLICTING_MODS[mid]))
+            except Exception:
+                pass
+        return found
+
+    def download_file(self, url, save_path, callback=None):
+        resp = requests.get(url, stream=True, timeout=120)
+        resp.raise_for_status()
+        total = int(resp.headers.get("content-length", 0))
+        written = 0
         with open(save_path, "wb") as f:
-            downloaded = 0
-            for chunk in response.iter_content(chunk_size=8192):
+            for chunk in resp.iter_content(8192):
                 if chunk:
                     f.write(chunk)
-                    downloaded += len(chunk)
-                    # Можно добавить прогресс бар здесь
-    
-    def extract_mrpack(self, mrpack_path, extract_to):
-        """Распаковка .mrpack файла"""
-        import zipfile
-        
-        with zipfile.ZipFile(mrpack_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_to)
-        
-        # Создаем конфигурацию для установки
-        self.create_install_config(extract_to)
-    
-    def create_install_config(self, pack_folder):
-        """Создание конфигурации для установки"""
+                    written += len(chunk)
+                    if callback and total > 0:
+                        callback(int(written * 100 / total))
+        if callback and total > 0:
+            callback(100)
+
+    def _install_modrinth_pack(self, version_data, mc_dir, callback=None):
+        files = version_data.get("files", [])
+        if not files:
+            return None, "Нет файлов для скачивания"
+        primary = next((f for f in files if f.get("primary")), files[0])
+        if not primary.get("url"):
+            return None, "Нет ссылки на файл"
+
+        ver_num = version_data.get("version_number", "?")
+        import tempfile, zipfile, json as j, shutil
+        tmp = tempfile.mkdtemp(prefix="mrpack-")
+        try:
+            mrpack_path = os.path.join(tmp, primary["filename"])
+            if callback:
+                callback(0)
+            print(f"Бекап старых модов перед установкой сборки...")
+            self.backup_mods(mc_dir)
+            self.download_file(primary["url"], mrpack_path, callback)
+
+            if callback:
+                callback(50)
+
+            with zipfile.ZipFile(mrpack_path, 'r') as z:
+                z.extractall(tmp)
+
+            index_path = os.path.join(tmp, "modrinth.index.json")
+            if not os.path.exists(index_path):
+                return None, "modrinth.index.json не найден в .mrpack"
+            with open(index_path, encoding="utf-8") as f:
+                idx = j.load(f)
+
+            deps = idx.get("dependencies", {})
+            mc_version = deps.get("minecraft", "unknown")
+            loader_type = "vanilla"
+            for k in deps:
+                if k in ("fabric-loader", "quilt-loader"):
+                    loader_type = k.replace("-loader", "")
+                elif k == "forge":
+                    loader_type = "forge"
+                elif k == "neoforge":
+                    loader_type = "neoforge"
+
+            pack_name = idx.get("name", version_data.get("name", "modpack")).strip()
+            safe_name = "".join(c for c in pack_name if c.isalnum() or c in " _-")
+
+            idx_files = idx.get("files", [])
+            total_files = len(idx_files)
+            installed = []
+            for i, entry in enumerate(idx_files):
+                path = entry.get("path", "")
+                downloads = entry.get("downloads", [])
+                if not path or not downloads:
+                    continue
+                target = os.path.normpath(os.path.join(mc_dir, path))
+                if not target.startswith(os.path.normpath(mc_dir) + os.sep):
+                    continue
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                if not os.path.exists(target):
+                    try:
+                        self.download_file(downloads[0], target, callback)
+                    except Exception:
+                        if os.path.exists(target):
+                            os.remove(target)
+                        pass
+                installed.append(target)
+                if callback and total_files > 0:
+                    callback(50 + int(40 * (i + 1) / total_files))
+
+            for odir in ("overrides", "client-overrides"):
+                sdir = os.path.join(tmp, odir)
+                if os.path.exists(sdir):
+                    for root, dirs, flist in os.walk(sdir):
+                        rel = os.path.relpath(root, sdir)
+                        for fn in flist:
+                            src = os.path.join(root, fn)
+                            dst = os.path.join(mc_dir, rel, fn)
+                            os.makedirs(os.path.dirname(dst), exist_ok=True)
+                            shutil.copy2(src, dst)
+                            installed.append(dst)
+
+            if callback:
+                callback(95)
+            self.deduplicate_mods(mc_dir)
+            if callback:
+                callback(100)
+            return safe_name, {"mc_version": mc_version, "loader": loader_type,
+                               "_source": "modrinth", "_version_id": ver_num,
+                               "_installed_files": installed}
+        except Exception as e:
+            return None, str(e)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def _install_curseforge_pack(self, version_data, mc_dir, callback=None):
+        dl_url = version_data.get("downloadUrl", "")
+        if not dl_url:
+            try:
+                resp = requests.get(
+                    f"{self.curseforge_api}/mods/{version_data['modId']}/files/{version_data['id']}/download-url",
+                    headers={"x-api-key": get_cf_api_key(), "Accept": "application/json"}, timeout=15)
+                dl_url = resp.json().get("data", "")
+            except Exception:
+                pass
+        if not dl_url:
+            return None, "CurseForge: не удалось получить ссылку"
+
+        import tempfile, zipfile, json as j, shutil
+        tmp = tempfile.mkdtemp(prefix="cfpack-")
+        try:
+            filename = version_data.get("fileName", "pack.zip")
+            zip_path = os.path.join(tmp, filename)
+            if callback:
+                callback(0)
+            print(f"Бекап старых модов перед установкой сборки...")
+            self.backup_mods(mc_dir)
+            self.download_file(dl_url, zip_path, callback)
+
+            if callback:
+                callback(30)
+
+            with zipfile.ZipFile(zip_path, 'r') as z:
+                z.extractall(tmp)
+
+            manifest_path = os.path.join(tmp, "manifest.json")
+            installed = []
+            if not os.path.exists(manifest_path):
+                mc_version = "unknown"
+                loader_type = "vanilla"
+                for root, dirs, flist in os.walk(tmp):
+                    for fn in flist:
+                        if fn.endswith((".jar", ".litemod")):
+                            rel = os.path.relpath(os.path.join(root, fn), tmp)
+                            dst = os.path.join(mc_dir, rel)
+                            os.makedirs(os.path.dirname(dst), exist_ok=True)
+                            shutil.copy2(os.path.join(root, fn), dst)
+                            installed.append(dst)
+                if callback:
+                    callback(100)
+                return "curseforge-pack", {"mc_version": mc_version, "loader": loader_type, "_source": "curseforge", "_version_id": str(version_data.get("id", "")), "_installed_files": installed}
+
+            with open(manifest_path, encoding="utf-8") as f:
+                manifest = j.load(f)
+
+            mc_version = manifest.get("minecraft", {}).get("version", "unknown")
+            loader_data = manifest.get("minecraft", {}).get("modLoaders", [{}])[0] if manifest.get("minecraft", {}).get("modLoaders") else {}
+            loader_id = loader_data.get("id", "")
+            loader_type = "forge"
+            if "fabric" in loader_id.lower():
+                loader_type = "fabric"
+            elif "quilt" in loader_id.lower():
+                loader_type = "quilt"
+            elif "neoforge" in loader_id.lower():
+                loader_type = "neoforge"
+
+            cf_files = manifest.get("files", [])
+            for i, fentry in enumerate(cf_files):
+                project_id = fentry.get("projectID", 0)
+                file_id = fentry.get("fileID", 0)
+                fpath = fentry.get("filePathOverride", fentry.get("path", ""))
+                if not fpath:
+                    continue
+                try:
+                    fresp = requests.get(
+                        f"{self.curseforge_api}/mods/{project_id}/files/{file_id}/download-url",
+                        headers={"x-api-key": get_cf_api_key(), "Accept": "application/json"}, timeout=15)
+                    furl = fresp.json().get("data", "")
+                    if furl:
+                        target = os.path.normpath(os.path.join(mc_dir, fpath))
+                        if not target.startswith(os.path.normpath(mc_dir) + os.sep):
+                            continue
+                        os.makedirs(os.path.dirname(target), exist_ok=True)
+                        if not os.path.exists(target):
+                            try:
+                                self.download_file(furl, target, callback)
+                            except Exception:
+                                if os.path.exists(target):
+                                    os.remove(target)
+                                pass
+                        installed.append(target)
+                except Exception:
+                    pass
+                if callback and cf_files:
+                    callback(30 + int(60 * (i + 1) / len(cf_files)))
+
+            for odir in ("overrides",):
+                sdir = os.path.join(tmp, odir)
+                if os.path.exists(sdir):
+                    for root, dirs, flist in os.walk(sdir):
+                        rel = os.path.relpath(root, sdir)
+                        for fn in flist:
+                            src = os.path.join(root, fn)
+                            dst = os.path.join(mc_dir, rel, fn)
+                            os.makedirs(os.path.dirname(dst), exist_ok=True)
+                            shutil.copy2(src, dst)
+                            installed.append(dst)
+
+            if callback:
+                callback(95)
+            self.deduplicate_mods(mc_dir)
+            if callback:
+                callback(100)
+            return manifest.get("name", "curseforge-pack"), {"mc_version": mc_version, "loader": loader_type, "_source": "curseforge", "_version_id": str(version_data.get("id", "")), "_installed_files": installed}
+        except Exception as e:
+            return None, str(e)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def download_and_install(self, version_data, source, install_base, callback=None):
+        if source == "modrinth":
+            return self._install_modrinth_pack(version_data, install_base, callback)
+        elif source == "curseforge":
+            return self._install_curseforge_pack(version_data, install_base, callback)
+        return None, "Неизвестный источник"
+
+    def create_install_config(self, pack_folder, source, version_id, mc_versions, loaders):
+        os.makedirs(pack_folder, exist_ok=True)
         config = {
-            "type": "modrinth_modpack",
+            "type": f"{source}_modpack",
+            "source": source,
+            "version_id": version_id,
+            "mc_versions": mc_versions if isinstance(mc_versions, list) else [mc_versions],
+            "loaders": loaders if isinstance(loaders, list) else [loaders],
             "install_path": pack_folder,
             "installed_at": datetime.datetime.now().isoformat()
         }
-        
-        config_path = os.path.join(pack_folder, "superlauncher_config.json")
-        with open(config_path, "w", encoding="utf-8") as f:
+        with open(os.path.join(pack_folder, "superlauncher_config.json"), "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
-    
-    def get_installed_packs(self, install_path):
-        """Получение списка установленных сборок"""
+
+    def get_installed_packs(self, install_base):
         installed = []
-        
-        if os.path.exists(install_path):
-            for folder in os.listdir(install_path):
-                pack_folder = os.path.join(install_path, folder)
-                config_path = os.path.join(pack_folder, "superlauncher_config.json")
-                
-                if os.path.exists(config_path):
+        if os.path.exists(install_base):
+            for folder in os.listdir(install_base):
+                cfg = os.path.join(install_base, folder, "superlauncher_config.json")
+                if os.path.exists(cfg):
                     try:
-                        with open(config_path, "r", encoding="utf-8") as f:
-                            config = json.load(f)
-                            config["name"] = folder
-                            installed.append(config)
+                        with open(cfg, encoding="utf-8") as f:
+                            conf = json.load(f)
+                            conf["name"] = folder
+                            installed.append(conf)
                     except:
                         pass
-        
         return installed
-    
-    def create_custom_build(self, name, minecraft_version, loader, mods):
-        """Создание кастомной сборки"""
-        build_folder = f"builds/{name}_{minecraft_version}_{loader}"
-        os.makedirs(build_folder, exist_ok=True)
-        
-        config = {
-            "name": name,
-            "minecraft_version": minecraft_version,
-            "loader": loader,
-            "mods": mods,
-            "created_at": datetime.datetime.now().isoformat(),
-            "type": "custom"
-        }
-        
-        config_path = os.path.join(build_folder, "build_config.json")
-        with open(config_path, "w", encoding="utf-8") as f:
-            json.dump(config, f, indent=2)
-        
-        return build_folder
-    
-# =========== ДОБАВИТЬ ПОСЛЕ BuildsManager ===========
-class NewYearCountdown(QLabel):
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.new_year = self.get_next_new_year()
-        self.update_interval = 1000  # 1 секунда
-        
-        self.setStyleSheet("""
-            NewYearCountdown {
-                background-color: rgba(10, 46, 54, 0.8);
-                border: 2px solid #FFD700;
-                border-radius: 15px;
-                padding: 10px;
-                font-size: 16px;
-                font-weight: bold;
-                color: #FFD700;
-                text-align: center;
-                margin: 5px;
-            }
-        """)
-        
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_countdown)
-        self.timer.start(self.update_interval)
-        
-        self.update_countdown()
-    
-    def get_next_new_year(self):
-        """Получение даты следующего Нового Года"""
-        now = datetime.datetime.now()
-        current_year = now.year
-        
-        # Если уже январь, следующий Новый Год в следующем году
-        if now.month == 1 and now.day < 15:
-            return datetime.datetime(current_year, 1, 1, 0, 0, 0)
-        else:
-            return datetime.datetime(current_year + 1, 1, 1, 0, 0, 0)
-    
-    def update_countdown(self):
-        """Обновление счетчика"""
-        now = datetime.datetime.now()
-        time_left = self.new_year - now
-        
-        if time_left.total_seconds() <= 0:
-            self.setText("🎉 С НОВЫМ 2026 ГОДОМ! 🎉")
-            self.setStyleSheet("""
-                NewYearCountdown {
-                    background-color: rgba(255, 51, 51, 0.8);
-                    border: 3px solid #FFD700;
-                    border-radius: 15px;
-                    padding: 15px;
-                    font-size: 20px;
-                    font-weight: bold;
-                    color: #FFFFFF;
-                    text-align: center;
-                    margin: 5px;
-                }
-            """)
-            self.timer.stop()
-            
-            # Запускаем праздничные эффекты
-            self.start_celebration()
-        else:
-            days = time_left.days
-            hours, remainder = divmod(time_left.seconds, 3600)
-            minutes, seconds = divmod(remainder, 60)
-            
-            # Эмодзи для каждого периода
-            emoji = "🎄" if days > 3 else "🎅" if days > 1 else "⏰"
-            
-            self.setText(
-                f"{emoji} До Нового 2026 Года: "
-                f"{days} д {hours:02d}:{minutes:02d}:{seconds:02d}"
-            )
-            
-            # Меняем цвет при приближении
-            if days == 0:
-                self.setStyleSheet("""
-                    NewYearCountdown {
-                        background-color: rgba(255, 215, 0, 0.3);
-                        border: 2px solid #FF3333;
-                        border-radius: 15px;
-                        padding: 10px;
-                        font-size: 18px;
-                        font-weight: bold;
-                        color: #FF3333;
-                        text-align: center;
-                        margin: 5px;
-                        animation: pulse 2s infinite;
-                    }
-                """)
-    
-    def start_celebration(self):
-        """Запуск праздничных эффектов"""
-        # Можно добавить анимации, звуки и т.д.
-        pass
 
-# =========== ДОБАВИТЬ ПОСЛЕ NewYearCountdown ===========
+    def _install_local_mrpack(self, mrpack_path, mc_dir, callback=None):
+        import tempfile, zipfile, json as j, shutil
+        tmp = tempfile.mkdtemp(prefix="import-")
+        try:
+            if callback:
+                callback(0)
+            print(f"Бекап старых модов перед импортом сборки...")
+            self.backup_mods(mc_dir)
+            with zipfile.ZipFile(mrpack_path, 'r') as z:
+                z.extractall(tmp)
+            if callback:
+                callback(10)
+            index_path = os.path.join(tmp, "modrinth.index.json")
+            if not os.path.exists(index_path):
+                return None, "modrinth.index.json не найден"
+            with open(index_path, encoding="utf-8") as f:
+                idx = j.load(f)
+            deps = idx.get("dependencies", {})
+            mc_version = deps.get("minecraft", "unknown")
+            loader_type = "vanilla"
+            for k in deps:
+                if k in ("fabric-loader", "quilt-loader"):
+                    loader_type = k.replace("-loader", "")
+                elif k == "forge":
+                    loader_type = "forge"
+                elif k == "neoforge":
+                    loader_type = "neoforge"
+            pack_name = idx.get("name", "imported").strip()
+            safe_name = "".join(c for c in pack_name if c.isalnum() or c in " _-")
+            idx_files = idx.get("files", [])
+            installed = []
+            for i, entry in enumerate(idx_files):
+                path = entry.get("path", "")
+                downloads = entry.get("downloads", [])
+                if not path or not downloads:
+                    continue
+                target = os.path.normpath(os.path.join(mc_dir, path))
+                if not target.startswith(os.path.normpath(mc_dir) + os.sep):
+                    continue
+                os.makedirs(os.path.dirname(target), exist_ok=True)
+                if not os.path.exists(target):
+                    try:
+                        self.download_file(downloads[0], target, callback)
+                    except Exception:
+                        if os.path.exists(target):
+                            os.remove(target)
+                        pass
+                installed.append(target)
+                if callback and idx_files:
+                    callback(10 + int(80 * (i + 1) / len(idx_files)))
+            for odir in ("overrides", "client-overrides"):
+                sdir = os.path.join(tmp, odir)
+                if os.path.exists(sdir):
+                    for root, dirs, flist in os.walk(sdir):
+                        rel = os.path.relpath(root, sdir)
+                        for fn in flist:
+                            src = os.path.join(root, fn)
+                            dst = os.path.join(mc_dir, rel, fn)
+                            os.makedirs(os.path.dirname(dst), exist_ok=True)
+                            shutil.copy2(src, dst)
+                            installed.append(dst)
+            if callback:
+                callback(95)
+            self.deduplicate_mods(mc_dir)
+            if callback:
+                callback(100)
+            return safe_name, {"mc_version": mc_version, "loader": loader_type, "_installed_files": installed}
+        except Exception as e:
+            return None, str(e)
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    
+    def _cf_cache_path(self, mc_dir, slug, mc_ver, loader_type):
+        cache_dir = os.path.join(mc_dir, "cache", "curseforge")
+        os.makedirs(cache_dir, exist_ok=True)
+        return os.path.join(cache_dir, f"{slug}_{mc_ver}_{loader_type}.jar")
+
+    def download_curseforge_mods_from_modlist(self, mc_dir, callback=None, mc_ver=None, loader_type="forge"):
+        import re, hashlib
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        modlist_path = os.path.join(mc_dir, "modlist.html")
+        if not os.path.exists(modlist_path):
+            return 0, "modlist.html не найден"
+        with open(modlist_path, encoding="utf-8") as f:
+            html = f.read()
+        urls = re.findall(r'href="(https://www\.curseforge\.com/minecraft/[^"]+)"', html)
+        if not urls:
+            return 0, "Нет CurseForge ссылок в modlist.html"
+        total = len(urls)
+        if not mc_ver:
+            mc_ver = "1.20.1"
+        loader_map = {"forge": 1, "fabric": 4, "quilt": 5, "neoforge": 6}
+        mod_loader_type = loader_map.get(loader_type.lower(), 1)
+        cf_key = get_cf_api_key()
+
+        # Подготовка списка задач: (slug, dest_dir, cache_path)
+        tasks = []
+        for url in urls:
+            parts = url.split("/")
+            cat = parts[-2] if len(parts) >= 2 else "mc-mods"
+            slug = parts[-1] if parts else ""
+            if not slug:
+                continue
+            dest_dir = os.path.join(mc_dir, "mods")
+            if "texture" in cat:
+                dest_dir = os.path.join(mc_dir, "resourcepacks")
+            elif "shader" in cat:
+                dest_dir = os.path.join(mc_dir, "shaderpacks")
+            os.makedirs(dest_dir, exist_ok=True)
+            exists = any(slug.replace("-", "").lower() in f.replace("-", "").lower()
+                         for f in os.listdir(dest_dir) if f.endswith((".jar", ".zip")))
+            if exists:
+                continue
+            cache_path = self._cf_cache_path(mc_dir, slug, mc_ver, loader_type)
+            if os.path.exists(cache_path):
+                # копируем из кэша
+                fname = os.path.basename(cache_path)
+                import shutil
+                shutil.copy2(cache_path, os.path.join(dest_dir, fname))
+                print(f"✓ {slug} (из кэша)")
+                continue
+            tasks.append((slug, dest_dir, cache_path))
+
+        if not tasks:
+            if callback:
+                callback(100)
+            return 0, "Всё уже скачано"
+
+        completed = [0]
+        lock = __import__("threading").Lock()
+        results = {"downloaded": 0, "skipped": 0}
+
+        def process_one(slug, dest_dir, cache_path):
+            try:
+                search = requests.get(
+                    f"{self.curseforge_api}/mods/search?gameId=432&slug={slug}",
+                    headers={"x-api-key": cf_key, "Accept": "application/json"}, timeout=10)
+                if search.status_code != 200:
+                    return False, slug, "search fail"
+                mods_list = search.json().get("data", [])
+                if not mods_list:
+                    return False, slug, "not found"
+                mod_id = mods_list[0]["id"]
+                files_resp = requests.get(
+                    f"{self.curseforge_api}/mods/{mod_id}/files?gameVersion={mc_ver}&modLoaderType={mod_loader_type}",
+                    headers={"x-api-key": cf_key, "Accept": "application/json"}, timeout=10)
+                if files_resp.status_code != 200:
+                    return False, slug, "files list fail"
+                files_data = files_resp.json().get("data", [])
+                if not files_data:
+                    return False, slug, "no files"
+                file_id = files_data[0]["id"]
+                dl_resp = requests.get(
+                    f"{self.curseforge_api}/mods/{mod_id}/files/{file_id}/download-url",
+                    headers={"x-api-key": cf_key, "Accept": "application/json"}, timeout=10)
+                if dl_resp.status_code != 200:
+                    return False, slug, "dl-url fail"
+                dl_url = dl_resp.json().get("data", "")
+                if not dl_url:
+                    return False, slug, "no dl-url"
+                fname = files_data[0].get("fileName", f"{slug}.jar")
+                save_path = os.path.join(dest_dir, fname)
+                dl_resp2 = requests.get(dl_url, timeout=60, stream=True)
+                if dl_resp2.status_code != 200:
+                    return False, slug, "download fail"
+                with open(save_path, "wb") as f:
+                    for chunk in dl_resp2.iter_content(65536):
+                        if chunk:
+                            f.write(chunk)
+                # кэшируем
+                import shutil
+                shutil.copy2(save_path, cache_path)
+                return True, slug, fname
+            except Exception as e:
+                return False, slug, str(e)
+
+        max_workers = min(5, len(tasks))
+        with ThreadPoolExecutor(max_workers=max_workers) as pool:
+            futures = {pool.submit(process_one, slug, d, c): slug for slug, d, c in tasks}
+            for fut in as_completed(futures):
+                ok, slug, info = fut.result()
+                with lock:
+                    completed[0] += 1
+                    if callback:
+                        callback(int(90 * completed[0] / len(tasks)))
+                    if ok:
+                        results["downloaded"] += 1
+                        print(f"✓ {slug} -> {info}")
+                    else:
+                        results["skipped"] += 1
+                        print(f"× {slug}: {info}")
+
+        if callback:
+            callback(100)
+        return (results["downloaded"],
+                f"Загружено: {results['downloaded']}/{len(tasks)}, пропущено: {results['skipped']}")
+
+# =========== ДОБАВИТЬ ПОСЛЕ BuildsManager ===========
 class SkinsManager:
     def __init__(self, account_system):
         self.account_system = account_system
@@ -2013,70 +2181,6 @@ class LoginDialog(QDialog):
         """Получение данных пользователя"""
         return self.user_data
     
-# =========== ДОБАВИТЬ ПОСЛЕ LoginDialog ===========
-class GiftNotification(QDialog):
-    def __init__(self, gift_data, parent=None):
-        super().__init__(parent)
-        self.gift_data = gift_data
-        
-        self.setWindowTitle("🎁 Новый подарок!")
-        self.setFixedSize(400, 300)
-        
-        layout = QVBoxLayout()
-        
-        # Иконка подарка
-        icon_label = QLabel(gift_data.get("icon", "🎁"))
-        icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        icon_label.setStyleSheet("font-size: 64px;")
-        layout.addWidget(icon_label)
-        
-        # Название
-        name_label = QLabel(f"<h2>{gift_data['name']}</h2>")
-        name_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        name_label.setStyleSheet("color: #FFD700;")
-        layout.addWidget(name_label)
-        
-        # Описание
-        description = self.get_gift_description(gift_data)
-        desc_label = QLabel(description)
-        desc_label.setWordWrap(True)
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(desc_label)
-        
-        # Кнопка
-        self.btn_claim = QPushButton("Получить подарок!")
-        self.btn_claim.setStyleSheet("""
-            QPushButton {
-                background-color: #FF3333;
-                color: white;
-                font-size: 16px;
-                font-weight: bold;
-                padding: 15px;
-                border-radius: 10px;
-            }
-        """)
-        self.btn_claim.clicked.connect(self.accept)
-        layout.addWidget(self.btn_claim)
-        
-        self.setLayout(layout)
-    
-    def get_gift_description(self, gift_data):
-        """Получение описания подарка"""
-        gift_type = gift_data["type"]
-        
-        if gift_type == "xp":
-            return f"Вы получили {gift_data['amount']} опыта!"
-        elif gift_type == "skin":
-            return f"Новый скин: {gift_data['name']}"
-        elif gift_type == "theme":
-            return f"Новая тема оформления!"
-        elif gift_type == "premium":
-            return f"Премиум доступ на {gift_data['days']} дней!"
-        elif gift_type == "resource_pack":
-            return "Новый набор текстур!"
-        else:
-            return "Специальный подарок!"
-
 class AnimatedButton(QPushButton):
     def __init__(self, text="", parent=None):
         super().__init__(text, parent)
@@ -2137,6 +2241,205 @@ class AnimatedButton(QPushButton):
         painter.end()
 
 
+class AIRequestThread(QThread):
+    finished = pyqtSignal(object)
+
+    def __init__(self, api_url, api_key, model, system_prompt, messages):
+        super().__init__()
+        self.api_url = api_url
+        self.api_key = api_key
+        self.model = model
+        self.system_prompt = system_prompt
+        self.messages = messages
+
+    def run(self):
+        try:
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            body = [{"role": "system", "content": self.system_prompt}] + self.messages if self.system_prompt else self.messages
+            payload = {"model": self.model, "messages": body, "max_tokens": 2048}
+            url = self.api_url.rstrip("/") + "/chat/completions"
+            resp = requests.post(url, headers=headers, json=payload, timeout=120)
+            resp.raise_for_status()
+            data = resp.json()
+            choice = data.get("choices", [{}])[0]
+            content = choice.get("message", {}).get("content", "")
+            self.finished.emit(("ok", content))
+        except Exception as e:
+            self.finished.emit(("error", str(e)))
+
+
+class AIAgentPage(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.parent_window = parent
+        self.config = load_config()
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
+
+        title = QLabel("🤖 AI Агент")
+        title.setStyleSheet("font-size: 26px; font-weight: bold; color: white;")
+        layout.addWidget(title)
+
+        settings_frame = QFrame()
+        settings_frame.setStyleSheet("QFrame { background: rgba(255,255,255,0.05); border-radius: 8px; padding: 8px; }")
+        slayout = QVBoxLayout(settings_frame)
+
+        row1 = QHBoxLayout()
+        row1.addWidget(QLabel("API URL:"))
+        self.api_url = QLineEdit(self.config.get("ai_api_url", "https://api.openai.com/v1"))
+        self.api_url.setStyleSheet("background: #2f2f2f; color: white; border: 1px solid #444; border-radius: 4px; padding: 4px;")
+        row1.addWidget(self.api_url)
+        slayout.addLayout(row1)
+
+        row2 = QHBoxLayout()
+        row2.addWidget(QLabel("API Key:"))
+        self.api_key = QLineEdit(self.config.get("ai_api_key", ""))
+        self.api_key.setEchoMode(QLineEdit.EchoMode.Password)
+        self.api_key.setStyleSheet("background: #2f2f2f; color: white; border: 1px solid #444; border-radius: 4px; padding: 4px;")
+        row2.addWidget(self.api_key)
+        slayout.addLayout(row2)
+
+        row3 = QHBoxLayout()
+        row3.addWidget(QLabel("Модель:"))
+        self.model_combo = QComboBox()
+        models = ["gpt-4o-mini", "gpt-4o", "gpt-3.5-turbo", "claude-sonnet-4", "claude-haiku-4"]
+        self.model_combo.addItems(models + ["custom"])
+        self.model_combo.setCurrentText(self.config.get("ai_model", "gpt-4o-mini"))
+        self.model_combo.setStyleSheet("background: #2f2f2f; color: white; border: 1px solid #444; border-radius: 4px; padding: 3px;")
+        self.model_combo.currentTextChanged.connect(self._on_model_changed)
+        row3.addWidget(self.model_combo)
+        self.custom_model = QLineEdit()
+        self.custom_model.setPlaceholderText("custom model")
+        self.custom_model.hide()
+        self.custom_model.setStyleSheet("background: #2f2f2f; color: white; border: 1px solid #444; border-radius: 4px; padding: 4px;")
+        row3.addWidget(self.custom_model)
+        slayout.addLayout(row3)
+
+        row4 = QVBoxLayout()
+        row4.addWidget(QLabel("System prompt:"))
+        self.system_prompt = QTextEdit()
+        self.system_prompt.setPlainText(self.config.get("ai_system_prompt",
+            "You are a helpful Minecraft assistant. Help with mods, modpacks, servers, and gameplay."))
+        self.system_prompt.setMaximumHeight(60)
+        self.system_prompt.setStyleSheet("background: #2f2f2f; color: white; border: 1px solid #444; border-radius: 4px; padding: 4px;")
+        row4.addWidget(self.system_prompt)
+        slayout.addLayout(row4)
+
+        btn_save = QPushButton("💾 Сохранить настройки")
+        btn_save.setStyleSheet("background: #4facfe; color: white; border: none; border-radius: 4px; padding: 6px;")
+        btn_save.clicked.connect(self._save_settings)
+        slayout.addWidget(btn_save)
+        layout.addWidget(settings_frame)
+
+        self.chat_list = QListWidget()
+        self.chat_list.setStyleSheet("""
+            QListWidget { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 8px; color: white; font-size: 13px; }
+            QListWidget::item { padding: 8px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+        """)
+        layout.addWidget(self.chat_list, 1)
+
+        input_layout = QHBoxLayout()
+        self.input_text = QTextEdit()
+        self.input_text.setPlaceholderText("Напиши сообщение...")
+        self.input_text.setMaximumHeight(60)
+        self.input_text.setStyleSheet("background: #2f2f2f; color: white; border: 1px solid #444; border-radius: 8px; padding: 6px;")
+        input_layout.addWidget(self.input_text)
+
+        btn_send = QPushButton("➤")
+        btn_send.setFixedSize(50, 50)
+        btn_send.setStyleSheet("background: #4facfe; color: white; border: none; border-radius: 8px; font-size: 20px;")
+        btn_send.clicked.connect(self._send_message)
+        input_layout.addWidget(btn_send)
+        layout.addLayout(input_layout)
+
+        self.input_text.installEventFilter(self)
+
+        self._add_message("system", "Привет! Я AI ассистент по Minecraft. Задавай любые вопросы о модах, сборках и игре!")
+
+    def _on_model_changed(self, text):
+        self.custom_model.setVisible(text == "custom")
+
+    def _save_settings(self):
+        config = load_config()
+        config["ai_api_url"] = self.api_url.text()
+        config["ai_api_key"] = self.api_key.text()
+        config["ai_model"] = self.model_combo.currentText()
+        config["ai_system_prompt"] = self.system_prompt.toPlainText()
+        save_config(config)
+        QMessageBox.information(self, "Готово", "Настройки AI сохранены")
+
+    def _add_message(self, role, text):
+        icons = {"user": "🧑", "assistant": "🤖", "system": "ℹ️"}
+        prefix = f"{icons.get(role, 'ℹ️')} {role.capitalize()}"
+        if role == "user":
+            prefix = "🧑 Вы"
+        elif role == "assistant":
+            prefix = "🤖 AI"
+        item = QListWidgetItem(f"{prefix}: {text}")
+        item.setData(Qt.ItemDataRole.UserRole, {"role": role, "text": text})
+        self.chat_list.addItem(item)
+        self.chat_list.scrollToBottom()
+
+    def _remove_last_system(self):
+        for i in range(self.chat_list.count() - 1, -1, -1):
+            item = self.chat_list.item(i)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data and data.get("role") == "system" and data.get("text") == "Думаю...":
+                self.chat_list.takeItem(i)
+                break
+
+    def eventFilter(self, obj, event):
+        if obj == self.input_text and event.type() == QEvent.Type.KeyPress:
+            if event.key() == Qt.Key.Key_Return and not (event.modifiers() & Qt.KeyboardModifier.ShiftModifier):
+                self._send_message()
+                return True
+        return super().eventFilter(obj, event)
+
+    def _send_message(self):
+        text = self.input_text.toPlainText().strip()
+        if not text:
+            return
+        self.input_text.clear()
+        self._add_message("user", text)
+        self._add_message("system", "Думаю...")
+        self._do_request()
+
+    def _do_request(self):
+        messages = []
+        for i in range(self.chat_list.count()):
+            item = self.chat_list.item(i)
+            data = item.data(Qt.ItemDataRole.UserRole)
+            if data and data.get("role") in ("user", "assistant"):
+                messages.append({"role": data["role"], "content": data["text"]})
+        url = self.api_url.text().strip()
+        key = self.api_key.text().strip()
+        model = self.model_combo.currentText()
+        if model == "custom":
+            model = self.custom_model.text().strip()
+        system = self.system_prompt.toPlainText().strip()
+        if not key:
+            self._add_message("system", "❌ API ключ не указан. Введи его в настройках выше.")
+            return
+        thread = AIRequestThread(url, key, model, system, messages)
+        thread.finished.connect(self._on_response)
+        thread.start()
+
+    def _on_response(self, result):
+        self._remove_last_system()
+        status, content = result
+        if status == "ok" and content:
+            self._add_message("assistant", content)
+        else:
+            error = content or "Неизвестная ошибка"
+            self._add_message("system", f"❌ Ошибка: {error[:200]}")
+
+
 class GlassFrame(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -2186,7 +2489,6 @@ class ModernSidebar(QWidget):
         self.nav_items = [
             ("🏠", "Главная", "#ff6b6b"),
             ("👤", "Аккаунт", "#4ecdc4"),
-            ("🎁", "Подарки", "#45b7d1"),
             ("🧩", "Моды", "#96ceb4"),
             ("📦", "Сборки", "#feca57"),
             ("🖼️", "Скины", "#ff9ff3"),
@@ -2194,7 +2496,8 @@ class ModernSidebar(QWidget):
             ("🔄", "Обновления", "#5f27cd"),
             ("🖧", "Серверы", "#ff9f43"),
             ("⚙️", "Настройки", "#00d2d3"),
-            ("⛏️", "Minecraft", "#1dd1a1")
+            ("⛏️", "Minecraft", "#1dd1a1"),
+            ("🤖", "AI Агент", "#a855f7")
         ]
 
         for icon, text, color in self.nav_items:
@@ -2327,24 +2630,28 @@ class GradientLabel(QLabel):
 
 
 class LaunchThread(QThread):
-    launch_setup_signal = pyqtSignal(str, str)
+    launch_setup_signal = pyqtSignal(str, str, str)  # version_id, username, loader_type
     progress_update_signal = pyqtSignal(int, int, str)
     state_update_signal = pyqtSignal(bool)
+    error_signal = pyqtSignal(str)  # error message for UI
 
     def __init__(self):
         super().__init__()
         self.launch_setup_signal.connect(self.launch_setup)
         self.version_id = ''
         self.username = ''
-        self.loader_type = 'vanilla'  # по умолчанию ванилла
+        self.loader_type = 'vanilla'
+        self.max_ram = 4096
+        self.min_ram = 1024
+        self.java_path = ''
+        self.jvm_args = ''
         self.progress = 0
         self.progress_max = 100
         self.progress_label = ''
 
-    def launch_setup(self, version_id, username):
+    def launch_setup(self, version_id, username, loader_type):
         self.username = username
-        # Убираем проверку forge и fabric
-        self.loader_type = "vanilla"
+        self.loader_type = loader_type
         self.version_id = version_id
 
     def update_progress_label(self, value):
@@ -2362,29 +2669,83 @@ class LaunchThread(QThread):
     def run(self):
         self.state_update_signal.emit(True)
         try:
-            if self.loader_type == "vanilla":
-                install_minecraft_version(
-                    version=self.version_id,
-                    minecraft_directory=minecraft_directory,
-                    callback={
-                        'setStatus': self.update_progress_label,
-                        'setProgress': self.update_progress,
-                        'setMax': self.update_progress_max
-                    }
-                )
-            else:
-                raise Exception("Неизвестный тип загрузчика")
+            callback = {
+                'setStatus': self.update_progress_label,
+                'setProgress': self.update_progress,
+                'setMax': self.update_progress_max
+            }
 
+            # 1. Устанавливаем загрузчик
+            loader = self.loader_type.lower()
+            if loader == "vanilla":
+                install_minecraft_version(version=self.version_id,
+                    minecraft_directory=minecraft_directory, callback=callback)
+            elif loader == "fabric":
+                fabric_loader.install_fabric(minecraft_version=self.version_id,
+                    minecraft_directory=minecraft_directory, callback=callback)
+            elif loader == "forge":
+                forge_version = forge_loader.find_forge_version(self.version_id)
+                if not forge_version:
+                    raise Exception(f"Forge версия не найдена для {self.version_id}")
+                forge_loader.install_forge_version(forge_version,
+                    minecraft_directory, callback=callback)
+            elif loader == "quilt":
+                quilt_loader.install_quilt(minecraft_version=self.version_id,
+                    minecraft_directory=minecraft_directory, callback=callback)
+            elif loader == "neoforge":
+                self._nf_installed_version = self._install_neoforge(callback)
+            elif loader == "optifine":
+                self._install_optifine()
+            else:
+                install_minecraft_version(version=self.version_id,
+                    minecraft_directory=minecraft_directory, callback=callback)
+
+            # 2. Готовим опции запуска
             if self.username == '':
                 self.username = generate_username()[0]
 
             options = {
                 'username': self.username,
                 'uuid': str(uuid1()),
-                'token': ''
+                'token': '',
+                'jvmArguments': [
+                    f'-Xmx{self.max_ram}M',
+                    f'-Xms{self.min_ram}M',
+                    '-XX:+UnlockExperimentalVMOptions',
+                    '-XX:+UseG1GC',
+                    '-XX:G1NewSizePercent=20',
+                    '-XX:G1ReservePercent=20',
+                    '-XX:MaxGCPauseMillis=50',
+                    '-XX:G1HeapRegionSize=32M',
+                ],
+                'launcherName': 'SuperLauncher',
+                'launcherVersion': '2.0',
             }
+
+            if self.java_path and os.path.exists(self.java_path):
+                options['executablePath'] = self.java_path
+
+            if self.jvm_args:
+                extra_args = self.jvm_args.split()
+                options['jvmArguments'].extend(extra_args)
+
+            # 3. Определяем ID версии для запуска (у Forge/Fabric он может отличаться)
+            launch_version = self.version_id
+            if loader == "forge":
+                forge_ver = forge_loader.find_forge_version(self.version_id)
+                if forge_ver:
+                    launch_version = forge_loader.forge_to_installed_version(forge_ver)
+            elif loader == "fabric":
+                launch_version = f"fabric-loader-{fabric_loader.get_latest_loader_version()}-{self.version_id}"
+            elif loader == "quilt":
+                launch_version = f"quilt-loader-{self.version_id}"
+            elif loader == "neoforge":
+                launch_version = getattr(self, '_nf_installed_version', self.version_id)
+                if launch_version == self.version_id:
+                    raise Exception("NeoForge: не удалось определить версию для запуска")
+
             cmd = get_minecraft_command(
-                version=self.version_id,
+                version=launch_version,
                 minecraft_directory=minecraft_directory,
                 options=options
             )
@@ -2394,8 +2755,118 @@ class LaunchThread(QThread):
             print(f"Процесс Minecraft завершился с кодом: {proc.returncode}")
         except Exception as e:
             print("Ошибка при запуске Minecraft:", e)
+            import traceback
+            traceback.print_exc()
+            self.error_signal.emit(str(e))
         finally:
             self.state_update_signal.emit(False)
+
+    def _install_optifine(self):
+        """Установка OptiFine через прямое скачивание и запуск установщика"""
+        import urllib.request
+        import zipfile
+
+        optifine_dir = os.path.join(minecraft_directory, "mods", "optifine")
+        os.makedirs(optifine_dir, exist_ok=True)
+
+        # Парсим страницу OptiFine
+        self.update_progress_label("Поиск OptiFine...")
+        try:
+            import requests as req
+            resp = req.get("https://optifine.net/downloads", timeout=10)
+            html = resp.text
+            # Ищем ссылку на версию
+            import re
+            pattern = rf'/downloads/[^"]*{re.escape(self.version_id)}[^"]*\.jar'
+            match = re.search(pattern, html)
+            if not match:
+                raise Exception(f"OptiFine для {self.version_id} не найден")
+            dl_path = match.group(0)
+            dl_url = f"https://optifine.net{dl_path}"
+
+            jar_path = os.path.join(optifine_dir, f"OptiFine_{self.version_id}.jar")
+            if not os.path.exists(jar_path):
+                self.update_progress_label("Скачивание OptiFine...")
+                urllib.request.urlretrieve(dl_url, jar_path)
+
+            # Запускаем установщик OptiFine
+            self.update_progress_label("Запуск установщика OptiFine...")
+            java_exe = self.java_path or "java"
+            subprocess.run([java_exe, "-jar", jar_path], cwd=optifine_dir, check=True)
+
+            # После установки OptiFine версия будет как optifine_версия
+            self.version_id = f"{self.version_id}_optifine"
+            self.update_progress_label("OptiFine установлен!")
+        except Exception as e:
+            print(f"Ошибка установки OptiFine: {e}")
+            raise
+
+    def _install_neoforge(self, callback):
+        NF_API = "https://maven.neoforged.net/api/maven/versions/releases/net/neoforged/neoforge"
+        NF_MAVEN = "https://maven.neoforged.net/releases/net/neoforged/neoforge"
+        self.update_progress_label("Поиск NeoForge...")
+        try:
+            r = requests.get(NF_API, timeout=15)
+            r.raise_for_status()
+            versions = r.json()["versions"]
+        except Exception:
+            self.update_progress_label("API NeoForge недоступен, пробуем GitHub...")
+            try:
+                r = requests.get("https://api.github.com/repos/neoforged/NeoForge/releases?per_page=50", timeout=15)
+                r.raise_for_status()
+                versions = []
+                for rel in r.json():
+                    tag = rel.get("tag_name", "")
+                    parts = tag.split("-")
+                    if len(parts) == 2:
+                        versions.append(parts[1])
+            except Exception:
+                raise Exception("NeoForge недоступен (maven + GitHub). Проверь интернет или VPN.")
+
+        ver_parts = self.version_id.split(".")
+        mc_major = ver_parts[1]
+        mc_minor = ver_parts[2] if len(ver_parts) > 2 else ""
+        compatible = []
+        for v in versions:
+            vp = v.split(".")
+            if len(vp) < 2:
+                continue
+            if vp[0] == mc_major and (not mc_minor or vp[1] == mc_minor):
+                compatible.append(v)
+        if not compatible:
+            compatible = [v for v in versions if v.split(".")[0] == mc_major and len(v.split(".")) > 1]
+        if not compatible:
+            raise Exception(f"NeoForge не найдена для {self.version_id}")
+        loader_ver = compatible[-1]
+
+        installer_url = f"{NF_MAVEN}/{loader_ver}/neoforge-{loader_ver}-installer.jar"
+        self.update_progress_label(f"Скачивание NeoForge {loader_ver}...")
+        temp_dir = tempfile.mkdtemp(prefix="neoforge-")
+        installer_path = os.path.join(temp_dir, "neoforge-installer.jar")
+        try:
+            dl_resp = requests.get(installer_url, timeout=60, stream=True)
+            dl_resp.raise_for_status()
+            total = int(dl_resp.headers.get("content-length", 0))
+            written = 0
+            with open(installer_path, "wb") as f:
+                for chunk in dl_resp.iter_content(8192):
+                    f.write(chunk)
+                    written += len(chunk)
+                    if total > 0:
+                        self.update_progress(int(written * 100 / total))
+            self.update_progress_label("Запуск установщика NeoForge...")
+            java_exe = self.java_path or "java"
+            subprocess.run(
+                [java_exe, "-jar", installer_path, "--install-client", minecraft_directory],
+                check=True, timeout=120,
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+
+        installed_ver = f"neoforge-{loader_ver}"
+        install_minecraft_version(installed_ver, minecraft_directory, callback=callback)
+        return installed_ver
 
 
 # Функция возвращает все версии без фильтрации (Vanilla + Snapshots + Fabric + Forge)
@@ -2414,8 +2885,8 @@ def get_all_versions():
 class MinecraftLauncherPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent_window = parent  # сохраняем ссылку на родителя
-        self.config = load_config()  # читаем текущий язык
+        self.parent_window = parent
+        self.config = load_config()
 
         # Логотип
         self.logo = QLabel()
@@ -2450,6 +2921,17 @@ class MinecraftLauncherPage(QWidget):
         """)
         self.update_versions_list()
 
+        # Выбор загрузчика
+        self.loader_select = QComboBox()
+        self.loader_select.addItems(["Vanilla", "Fabric", "Forge", "Quilt", "OptiFine", "NeoForge"])
+        self.loader_select.setStyleSheet("""
+            background-color: #2f2f2f;
+            color: white;
+            border: 1px solid #444;
+            border-radius: 5px;
+            padding: 3px;
+        """)
+
         # Прогрессбар
         self.progress_spacer = QSpacerItem(20, 20, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Minimum)
         self.start_progress_label = QLabel('')
@@ -2477,6 +2959,7 @@ class MinecraftLauncherPage(QWidget):
         layout.addItem(self.titlespacer)
         layout.addWidget(self.username)
         layout.addWidget(self.version_select)
+        layout.addWidget(self.loader_select)
         layout.addItem(self.progress_spacer)
         layout.addWidget(self.start_progress_label)
         layout.addWidget(self.start_progress)
@@ -2576,6 +3059,38 @@ class SettingsPage(QWidget):
         self.rb_java.toggled.connect(self.java_path_input.setEnabled)
         self.rb_java.toggled.connect(self.buttons["browse_java"].setEnabled)
 
+        # ===== ОЗУ =====
+        self.ram_label = QLabel()
+        layout.addWidget(self.ram_label)
+        ram_layout = QHBoxLayout()
+        self.ram_slider = QSlider(Qt.Orientation.Horizontal)
+        self.ram_slider.setRange(1024, 32768)
+        self.ram_slider.setValue(self.config.get("max_ram", 4096))
+        self.ram_slider.setTickInterval(1024)
+        self.ram_slider.setSingleStep(512)
+        self.ram_value_label = QLabel(f'{self.ram_slider.value()} MB')
+        self.ram_slider.valueChanged.connect(lambda v: self.ram_value_label.setText(f'{v} MB'))
+        ram_layout.addWidget(self.ram_slider)
+        ram_layout.addWidget(self.ram_value_label)
+        layout.addLayout(ram_layout)
+
+        # ===== JVM аргументы =====
+        self.jvm_label = QLabel()
+        layout.addWidget(self.jvm_label)
+        self.jvm_input = QLineEdit(self.config.get("jvm_args", ""))
+        self.jvm_input.setPlaceholderText("-XX:+UseG1GC -XX:+UnlockExperimentalVMOptions")
+        layout.addWidget(self.jvm_input)
+
+        # ===== CurseForge API ключ =====
+        self.labels["curseforge_key"] = QLabel()
+        layout.addWidget(self.labels["curseforge_key"])
+        self.cf_key_input = QLineEdit(self.config.get("curseforge_api_key", ""))
+        self.cf_key_input.setPlaceholderText("Введите CurseForge API ключ...")
+        layout.addWidget(self.cf_key_input)
+        self.buttons["test_cf_key"] = QPushButton()
+        layout.addWidget(self.buttons["test_cf_key"])
+        self.buttons["test_cf_key"].clicked.connect(self.test_cf_key)
+
         # ===== Фоны страниц =====
         self.labels["page_bg"] = QLabel()
         layout.addWidget(self.labels["page_bg"])
@@ -2619,10 +3134,13 @@ class SettingsPage(QWidget):
         self.rb_java.setText(self.tr("Java (specify path)"))
         self.labels["java_path"].setText(self.tr("Java path (if Java is selected):"))
         self.buttons["browse_java"].setText(self.tr("Browse Java path"))
+        self.labels["curseforge_key"].setText(self.tr("CurseForge API Key:"))
+        self.buttons["test_cf_key"].setText(self.tr("Test key"))
         self.labels["page_bg"].setText(self.tr("Page backgrounds:"))
         self.buttons["save"].setText(self.tr("Save settings"))
+        self.ram_label.setText(self.tr("RAM allocation:"))
+        self.jvm_label.setText(self.tr("JVM arguments:"))
 
-        # если родитель имеет метод refresh_language, обновляем и его
         parent = self.parent()
         if parent and hasattr(parent, "refresh_language"):
             parent.refresh_language()
@@ -2648,14 +3166,52 @@ class SettingsPage(QWidget):
         if file:
             self.java_path_input.setText(file)
 
+    def test_cf_key(self):
+        key = self.cf_key_input.text().strip()
+        if not key:
+            QMessageBox.warning(self, "Ошибка", "Введите API ключ")
+            return
+        try:
+            resp = requests.get(
+                f"{CURSEFORGE_API}/mods/search?gameId=432&classId=6&pageSize=1",
+                headers={"x-api-key": key, "Accept": "application/json"}, timeout=10)
+            if resp.status_code == 200:
+                QMessageBox.information(self, "Успех", "✅ Ключ работает! CurseForge API отвечает.")
+            else:
+                QMessageBox.critical(self, "Ошибка",
+                    f"❌ Ключ не работает. HTTP {resp.status_code}: {resp.text[:200]}")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"❌ Не удалось проверить ключ:\n{e}")
+
     def save_settings(self):
         self.config["theme"] = self.theme_combo.currentText()
         self.config["language"] = self.lang_combo.currentText()
         self.config["launch_mode"] = "java" if self.rb_java.isChecked() else "launcher_lib"
         self.config["java_path"] = self.java_path_input.text()
         self.config["page_bg"] = self.config.get("page_bg", "dark")
+        self.config["max_ram"] = self.ram_slider.value()
+        self.config["jvm_args"] = self.jvm_input.text()
+        self.config["curseforge_api_key"] = self.cf_key_input.text().strip()
         save_config(self.config)
+        invalidate_cf_api_key_cache()
         self.update_texts()
+
+
+class IconLoadThread(QThread):
+    icon_data = pyqtSignal(object, bytes)
+
+    def __init__(self, items):
+        super().__init__()
+        self.items = items
+
+    def run(self):
+        for item, icon_url in self.items:
+            try:
+                resp = requests.get(icon_url, timeout=5)
+                if resp.status_code == 200:
+                    self.icon_data.emit(item, resp.content)
+            except Exception:
+                pass
 
 
 class ModDownloadThread(QThread):
@@ -2739,6 +3295,8 @@ class DiscordRPCThread(threading.Thread):
 
 
 class ModsPage(QWidget):
+    MOD_SOURCES = ["Modrinth", "CurseForge"]
+
     def __init__(self, parent=None):
         super().__init__(parent)
         self.parent_window = parent
@@ -2755,14 +3313,33 @@ class ModsPage(QWidget):
         self.title.setStyleSheet("font-size: 26px; font-weight: bold; margin-bottom: 10px; color: white;")
         self.layout.addWidget(self.title)
 
-        # Поиск
+        # Источник и поиск в одной строке
+        search_row = QHBoxLayout()
+
+        self.source_combo = QComboBox()
+        self.source_combo.addItems(self.MOD_SOURCES)
+        self.source_combo.setStyleSheet("""
+            background-color: #2f2f2f; color: white;
+            border: 1px solid #444; border-radius: 5px; padding: 3px;
+        """)
+        search_row.addWidget(self.source_combo)
+
         self.search_input = QLineEdit()
         self.search_input.returnPressed.connect(self.search_mods)
-        self.layout.addWidget(self.search_input)
+        self.search_input.setStyleSheet("""
+            background-color: #2f2f2f; color: white;
+            border: 1px solid #444; border-radius: 5px; padding: 5px;
+        """)
+        search_row.addWidget(self.search_input, 1)
+        self.layout.addLayout(search_row)
 
         # Список результатов
         self.results_list = QListWidget()
         self.results_list.setIconSize(QSize(64, 64))
+        self.results_list.setStyleSheet("""
+            background-color: #2f2f2f; color: white;
+            border: 1px solid #444; border-radius: 5px;
+        """)
         self.layout.addWidget(self.results_list)
 
         # Кнопки
@@ -2786,22 +3363,53 @@ class ModsPage(QWidget):
         return translations.get(lang, {}).get(key, key)
 
     def update_texts(self):
-        self.title.setText(f"🧩 {self.tr('Mods from Modrinth')}")
+        src = self.source_combo.currentText()
+        self.title.setText(f"🧩 {self.tr('Mods from')} {src}")
         self.search_input.setPlaceholderText(f"🔍 {self.tr('Search mod...')}")
         self.open_folder_button.setText(f"📂 {self.tr('Open mods folder')}")
         self.delete_all_button.setText(f"🗑 {self.tr('Delete all mods')}")
 
+    def _connect_item_clicked(self):
+        try:
+            self.results_list.itemClicked.disconnect(self.show_mod_dialog)
+        except TypeError:
+            pass
+        self.results_list.itemClicked.connect(self.show_mod_dialog)
+
+    def _load_icons_bg(self, items_with_urls):
+        if not hasattr(self, "_icon_thread") or not self._icon_thread.isRunning():
+            self._icon_thread = IconLoadThread(items_with_urls)
+            self._icon_thread.icon_data.connect(self._on_icon_data)
+            self._icon_thread.start()
+
+    def _on_icon_data(self, item, data):
+        try:
+            pm = QPixmap()
+            pm.loadFromData(data)
+            if not pm.isNull():
+                item.setIcon(QIcon(pm.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio,
+                                              Qt.TransformationMode.SmoothTransformation)))
+        except Exception:
+            pass
+
     def load_featured_mods(self):
         try:
-            url = f"{MODRINTH_API}/search?limit=20&index=relevance"
-            resp = requests.get(url)
+            url = f"{MODRINTH_API}/search?limit=20&index=downloads"
+            resp = requests.get(url, headers={"User-Agent": "SuperLauncher/2.0"}, timeout=10)
             data = resp.json()
             self.results_list.clear()
+            icon_items = []
             for hit in data["hits"]:
-                item = QListWidgetItem(f"{hit['title']} — {hit.get('description', '')}")
-                item.setData(Qt.ItemDataRole.UserRole, hit["project_id"])
+                desc = hit.get("description", "")[:80]
+                downloads = hit.get("downloads", 0)
+                item = QListWidgetItem(f"{hit['title']} ⬇{downloads} — {desc}")
+                item.setData(Qt.ItemDataRole.UserRole, ("modrinth", hit["project_id"]))
                 self.results_list.addItem(item)
-            self.results_list.itemClicked.connect(self.show_mod_dialog)
+                if hit.get("icon_url"):
+                    icon_items.append((item, hit["icon_url"]))
+            self._connect_item_clicked()
+            if icon_items:
+                self._load_icons_bg(icon_items)
         except Exception as e:
             QMessageBox.critical(self, self.tr("Error"), str(e))
 
@@ -2809,24 +3417,84 @@ class ModsPage(QWidget):
         query = self.search_input.text()
         if not query.strip():
             return
+        source = self.source_combo.currentText()
+        if source == "Modrinth":
+            self._search_modrinth(query)
+        else:
+            self._search_curseforge(query)
+
+    def _search_modrinth(self, query):
         try:
-            url = f"{MODRINTH_API}/search?query={query}"
-            resp = requests.get(url)
+            url = f"{MODRINTH_API}/search?query={query}&limit=30&index=relevance"
+            resp = requests.get(url, headers={"User-Agent": "SuperLauncher/2.0"}, timeout=10)
             data = resp.json()
             self.results_list.clear()
+            icon_items = []
             for hit in data["hits"]:
-                item = QListWidgetItem(f"{hit['title']} — {hit.get('description', '')}")
-                item.setData(Qt.ItemDataRole.UserRole, hit["project_id"])
+                if hit.get("project_type") != "mod":
+                    continue
+                desc = hit.get("description", "")[:80]
+                downloads = hit.get("downloads", 0)
+                item = QListWidgetItem(f"{hit['title']} ⬇{downloads} — {desc}")
+                item.setData(Qt.ItemDataRole.UserRole, ("modrinth", hit["project_id"]))
                 self.results_list.addItem(item)
-            self.results_list.itemClicked.connect(self.show_mod_dialog)
+                if hit.get("icon_url"):
+                    icon_items.append((item, hit["icon_url"]))
+            self._connect_item_clicked()
+            if icon_items:
+                self._load_icons_bg(icon_items)
         except Exception as e:
             QMessageBox.critical(self, self.tr("Error"), str(e))
 
+    def _search_curseforge(self, query):
+        try:
+            params = {
+                "gameId": 432,
+                "classId": 6,
+                "searchFilter": query,
+                "pageSize": 30,
+                "sortField": 2,
+                "sortOrder": "desc"
+            }
+            resp = requests.get(
+                f"{CURSEFORGE_API}/mods/search",
+                params=params,
+                headers={
+                    "x-api-key": get_cf_api_key(),
+                    "Accept": "application/json"
+                },
+                timeout=15
+            )
+            data = resp.json()
+            self.results_list.clear()
+            icon_items = []
+            for mod in data.get("data", []):
+                name = mod.get("name", "Unknown")
+                summary = mod.get("summary", "")[:80]
+                downloads = mod.get("downloadCount", 0)
+                item = QListWidgetItem(f"{name} ⬇{downloads} — {summary}")
+                item.setData(Qt.ItemDataRole.UserRole, ("curseforge", mod["id"]))
+                self.results_list.addItem(item)
+                logo = mod.get("logo", {})
+                if logo and logo.get("url"):
+                    icon_items.append((item, logo["url"]))
+            self._connect_item_clicked()
+            if icon_items:
+                self._load_icons_bg(icon_items)
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), f"CurseForge: {e}")
+
     def show_mod_dialog(self, item):
-        project_id = item.data(Qt.ItemDataRole.UserRole)
+        source, mod_id = item.data(Qt.ItemDataRole.UserRole)
+        if source == "modrinth":
+            self._show_modrinth_dialog(mod_id)
+        else:
+            self._show_curseforge_dialog(mod_id)
+
+    def _show_modrinth_dialog(self, project_id):
         try:
             versions_url = f"{MODRINTH_API}/project/{project_id}/version"
-            resp = requests.get(versions_url)
+            resp = requests.get(versions_url, headers={"User-Agent": "SuperLauncher/2.0"})
             versions = resp.json()
 
             if not versions:
@@ -2836,16 +3504,18 @@ class ModsPage(QWidget):
 
             dialog = QDialog(self)
             dialog.setWindowTitle(self.tr("Install mod"))
+            dialog.setMinimumWidth(400)
             layout = QVBoxLayout(dialog)
 
             version_box = QComboBox()
             version_loader_map = {}
             for v in versions:
-                mc_versions = v["game_versions"]
-                loaders = v["loaders"]
+                mc_versions = v.get("game_versions", [])
+                loaders = v.get("loaders", [])
                 if not mc_versions or not loaders:
                     continue
-                display_text = f"{mc_versions[0]} | {loaders[0]}"
+                ver_num = v.get("version_number", "?")
+                display_text = f"{mc_versions[0]} | {loaders[0]} | {ver_num}"
                 version_loader_map[display_text] = v
 
             if not version_loader_map:
@@ -2858,29 +3528,122 @@ class ModsPage(QWidget):
             layout.addWidget(version_box)
 
             install_button = QPushButton(self.tr("Install mod"))
+            install_button.setStyleSheet("""
+                background-color: #4facfe; color: white;
+                border: none; border-radius: 5px; padding: 8px; font-weight: bold;
+            """)
             layout.addWidget(install_button)
 
             install_button.clicked.connect(
-                lambda: self.download_selected_mod(version_loader_map[version_box.currentText()], dialog)
+                lambda: self._download_from_modrinth(version_loader_map[version_box.currentText()], dialog)
             )
 
             dialog.exec()
-
         except Exception as e:
             QMessageBox.critical(self, self.tr("Error"), str(e))
 
-    def download_selected_mod(self, version_data, dialog):
-        files = version_data["files"]
+    def _download_from_modrinth(self, version_data, dialog):
+        files = version_data.get("files", [])
         for file in files:
-            if file["filename"].endswith(".jar"):
+            if file.get("filename", "").endswith(".jar"):
                 url = file["url"]
                 filename = file["filename"]
                 save_path = os.path.join(self.mods_dir, filename)
                 dialog.close()
                 self.start_download(url, save_path)
                 return
-        QMessageBox.warning(self, self.tr("File not found"),
-                            self.tr("File not found"))
+        QMessageBox.warning(self, self.tr("File not found"), self.tr("File not found"))
+
+    def _show_curseforge_dialog(self, mod_id):
+        try:
+            resp = requests.get(
+                f"{CURSEFORGE_API}/mods/{mod_id}/files",
+                headers={
+                    "x-api-key": get_cf_api_key(),
+                    "Accept": "application/json"
+                },
+                timeout=10
+            )
+            data = resp.json()
+            files = data.get("data", [])
+
+            if not files:
+                QMessageBox.warning(self, self.tr("No available versions"),
+                                    self.tr("No versions available"))
+                return
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle(self.tr("Install mod"))
+            dialog.setMinimumWidth(500)
+            layout = QVBoxLayout(dialog)
+
+            file_box = QComboBox()
+            file_map = {}
+            LOADER_NAMES = {1: "Forge", 2: "Cauldron", 3: "LiteLoader", 4: "Fabric", 5: "Quilt", 6: "NeoForge"}
+            for f in files[:30]:
+                display_name = f.get("displayName", f.get("fileName", "?"))
+                mc_ver = "?"
+                file_loader = "?"
+                for sgv in f.get("sortableGameVersions", []):
+                    gv_type = sgv.get("gameVersionTypeId")
+                    gv_name = sgv.get("gameVersionName", "")
+                    if gv_type == 1:
+                        mc_ver = gv_name
+                    elif gv_type == 2:
+                        file_loader = LOADER_NAMES.get(int(gv_name), gv_name) if gv_name.isdigit() else gv_name
+                if mc_ver == "?":
+                    mc_ver = next((v for v in f.get("gameVersions", []) if v and v[0].isdigit()), "?")
+                dl_count = f.get("downloadCount", 0)
+                release_type = {1: "Release", 2: "Beta", 3: "Alpha"}.get(f.get("releaseType"), "")
+                label = f"{mc_ver} | {file_loader} | {display_name} ⬇{dl_count}"
+                if release_type:
+                    label += f" [{release_type}]"
+                file_map[label] = f
+                file_box.addItem(label)
+
+            layout.addWidget(QLabel(self.tr("Select file:")))
+            layout.addWidget(file_box)
+
+            install_button = QPushButton(self.tr("Install mod"))
+            install_button.setStyleSheet("""
+                background-color: #f1642e; color: white;
+                border: none; border-radius: 5px; padding: 8px; font-weight: bold;
+            """)
+            layout.addWidget(install_button)
+
+            install_button.clicked.connect(
+                lambda: self._download_from_curseforge(file_map[file_box.currentText()], dialog)
+            )
+
+            dialog.exec()
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), f"CurseForge: {e}")
+
+    def _download_from_curseforge(self, file_data, dialog):
+        file_id = file_data.get("id")
+        mod_id = file_data.get("modId")
+        try:
+            resp = requests.get(
+                f"{CURSEFORGE_API}/mods/{mod_id}/files/{file_id}/download-url",
+                headers={
+                    "x-api-key": get_cf_api_key(),
+                    "Accept": "application/json"
+                },
+                timeout=10
+            )
+            data = resp.json()
+            dl_url = data.get("data", "")
+            if not dl_url:
+                # fallback: build URL manually
+                filename = file_data.get("fileName", "mod.jar")
+                dl_url = f"https://media.forgecdn.net/files/{file_id // 1000}/{file_id % 1000}/{filename}"
+
+            filename = file_data.get("fileName", "mod.jar")
+            save_path = os.path.join(self.mods_dir, filename)
+            dialog.close()
+            self.start_download(dl_url, save_path)
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), f"CurseForge download: {e}")
 
     def start_download(self, url, save_path):
         self.progress_dialog = QDialog(self)
@@ -3009,11 +3772,9 @@ class NewsPage(QWidget):
         self.populate_news()
 
 
-CURRENT_VERSION = "v1.4.0.5"
-
-
 class UpdateDownloadThread(QThread):
     progress = pyqtSignal(int)
+    speed = pyqtSignal(str)
     finished = pyqtSignal(str)
 
     def __init__(self, url, filename):
@@ -3023,18 +3784,28 @@ class UpdateDownloadThread(QThread):
 
     def run(self):
         try:
-            with requests.get(self.url, stream=True) as r:
+            with requests.get(self.url, stream=True, timeout=30) as r:
                 r.raise_for_status()
-                total_length = int(r.headers.get("content-length", 0))
+                total = int(r.headers.get("content-length", 0))
                 downloaded = 0
+                start = time.time()
                 with open(self.filename, "wb") as f:
-                    for chunk in r.iter_content(chunk_size=8192):
+                    for chunk in r.iter_content(chunk_size=65536):
                         if chunk:
                             f.write(chunk)
                             downloaded += len(chunk)
-                            if total_length > 0:
-                                percent = int(downloaded * 100 / total_length)
-                                self.progress.emit(percent)
+                            if total > 0:
+                                pct = int(downloaded * 100 / total)
+                                self.progress.emit(pct)
+                                elapsed = time.time() - start
+                                if elapsed > 0:
+                                    speed_bps = downloaded / elapsed
+                                    if speed_bps > 1048576:
+                                        speed_str = f"{speed_bps/1048576:.1f} MB/s"
+                                    else:
+                                        speed_str = f"{speed_bps/1024:.0f} KB/s"
+                                    eta = (total - downloaded) / speed_bps if speed_bps > 0 else 0
+                                    self.speed.emit(f"{speed_str} | ETA: {eta:.0f}s")
             self.finished.emit(str(self.filename))
         except Exception as e:
             self.finished.emit(f"ERROR: {str(e)}")
@@ -3043,112 +3814,345 @@ class UpdateDownloadThread(QThread):
 class UpdatesPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.layout = QVBoxLayout(self)
-        self.layout.setContentsMargins(15, 15, 15, 15)
-        self.layout.setSpacing(10)
+        self.releases = []
+        self.download_url = None
+        self.download_version = None
 
-        self.title = QLabel("🔄 Проверка обновлений")
-        self.title.setStyleSheet("font-size:26px;font-weight:bold;color:white;")
-        self.layout.addWidget(self.title)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(12)
 
-        self.status_label = QLabel("Проверка доступных обновлений...")
-        self.status_label.setStyleSheet("color:#c0c0c0;font-size:14px;")
-        self.layout.addWidget(self.status_label)
+        # === HEADER ===
+        header = QHBoxLayout()
+        self.title = QLabel("🔄 Обновления")
+        self.title.setStyleSheet("font-size: 26px; font-weight: bold; color: white;")
+        header.addWidget(self.title)
+        header.addStretch()
 
-        self.update_button = QPushButton("Скачать и установить обновление")
-        self.update_button.setVisible(False)
-        self.update_button.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.update_button.clicked.connect(self.download_latest)
-        self.layout.addWidget(self.update_button)
+        self.btn_refresh = QPushButton("⟳ Проверить")
+        self.btn_refresh.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_refresh.setStyleSheet(
+            "QPushButton { background: #4facfe; color: white; border: none; "
+            "border-radius: 6px; padding: 8px 18px; font-weight: bold; }"
+            "QPushButton:hover { background: #3a8ed9; }")
+        self.btn_refresh.clicked.connect(self.check_for_updates)
+        header.addWidget(self.btn_refresh)
+        layout.addLayout(header)
 
-        self.latest_version_info = None
-        self.checked = False  # флаг, чтобы проверить только один раз
+        # === CURRENT VERSION CARD ===
+        self.version_card = QFrame()
+        self.version_card.setStyleSheet(
+            "QFrame { background: rgba(79, 172, 254, 0.1); border: 1px solid rgba(79,172,254,0.3); "
+            "border-radius: 12px; padding: 16px; }")
+        vc_layout = QHBoxLayout(self.version_card)
+        vc_layout.setContentsMargins(16, 12, 16, 12)
 
-        QTimer.singleShot(100, self.check_for_updates)  # запуск проверки один раз после запуска UI
+        vc_icon = QLabel("📦")
+        vc_icon.setStyleSheet("font-size: 32px;")
+        vc_layout.addWidget(vc_icon)
+
+        vc_info = QVBoxLayout()
+        vc_info.setSpacing(2)
+        vc_title = QLabel("Текущая версия")
+        vc_title.setStyleSheet("color: #888; font-size: 12px;")
+        vc_info.addWidget(vc_title)
+        self.vc_version = QLabel(CURRENT_VERSION)
+        self.vc_version.setStyleSheet("color: white; font-size: 22px; font-weight: bold;")
+        vc_info.addWidget(self.vc_version)
+        vc_layout.addLayout(vc_info)
+        vc_layout.addStretch()
+
+        self.vc_status = QLabel()
+        self.vc_status.setStyleSheet("color: #4caf50; font-size: 13px; font-weight: bold;")
+        vc_layout.addWidget(self.vc_status)
+
+        self.vc_channel = QLabel()
+        self.vc_channel.setStyleSheet("color: #888; font-size: 12px;")
+        vc_layout.addWidget(self.vc_channel)
+
+        layout.addWidget(self.version_card)
+
+        # === UPDATE AVAILABLE CARD ===
+        self.update_card = QFrame()
+        self.update_card.setVisible(False)
+        self.update_card.setStyleSheet(
+            "QFrame { background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76,175,80,0.4); "
+            "border-radius: 12px; padding: 16px; }")
+        uc_layout = QVBoxLayout(self.update_card)
+        uc_layout.setContentsMargins(16, 12, 16, 12)
+        uc_layout.setSpacing(8)
+
+        uc_header = QHBoxLayout()
+        self.uc_icon = QLabel("⬆")
+        self.uc_icon.setStyleSheet("font-size: 28px;")
+        uc_header.addWidget(self.uc_icon)
+        self.uc_title = QLabel()
+        self.uc_title.setStyleSheet("color: #4caf50; font-size: 18px; font-weight: bold;")
+        uc_header.addWidget(self.uc_title)
+        uc_header.addStretch()
+        self.uc_badge = QLabel()
+        self.uc_badge.setStyleSheet(
+            "background: #4caf50; color: white; padding: 2px 10px; "
+            "border-radius: 4px; font-size: 11px; font-weight: bold;")
+        uc_header.addWidget(self.uc_badge)
+        uc_layout.addLayout(uc_header)
+
+        self.uc_changelog = QLabel()
+        self.uc_changelog.setWordWrap(True)
+        self.uc_changelog.setStyleSheet("color: #ccc; font-size: 13px; padding: 4px 0;")
+        uc_layout.addWidget(self.uc_changelog)
+
+        uc_actions = QHBoxLayout()
+        self.btn_download = QPushButton("⬇ Скачать и установить")
+        self.btn_download.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_download.setStyleSheet(
+            "QPushButton { background: #4caf50; color: white; border: none; "
+            "border-radius: 6px; padding: 10px 24px; font-weight: bold; font-size: 14px; }"
+            "QPushButton:hover { background: #43a047; }"
+            "QPushButton:disabled { background: #555; }")
+        self.btn_download.clicked.connect(self.start_download)
+        uc_actions.addWidget(self.btn_download)
+
+        self.btn_skip = QPushButton("Пропустить")
+        self.btn_skip.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_skip.setStyleSheet(
+            "QPushButton { background: transparent; color: #888; border: 1px solid #555; "
+            "border-radius: 6px; padding: 10px 16px; font-size: 13px; }"
+            "QPushButton:hover { color: white; border-color: #888; }")
+        self.btn_skip.clicked.connect(lambda: self.update_card.setVisible(False))
+        uc_actions.addWidget(self.btn_skip)
+        uc_actions.addStretch()
+        uc_layout.addLayout(uc_actions)
+
+        # progress bar + speed
+        self.download_progress = QProgressBar()
+        self.download_progress.setVisible(False)
+        self.download_progress.setStyleSheet(
+            "QProgressBar { border: 1px solid #4caf50; border-radius: 6px; text-align: center; "
+            "height: 22px; background: #1a1a2e; color: white; }"
+            "QProgressBar::chunk { background: qlineargradient(x1:0,y1:0,x2:1,y2:0, "
+            "stop:0 #4caf50, stop:1 #81c784); border-radius: 5px; }")
+        uc_layout.addWidget(self.download_progress)
+
+        self.download_speed = QLabel()
+        self.download_speed.setVisible(False)
+        self.download_speed.setStyleSheet("color: #888; font-size: 11px;")
+        uc_layout.addWidget(self.download_speed)
+
+        layout.addWidget(self.update_card)
+
+        # === RELEASE NOTES / VERSION HISTORY ===
+        notes_label = QLabel("📋 История версий")
+        notes_label.setStyleSheet("font-size: 18px; font-weight: bold; color: white; margin-top: 8px;")
+        layout.addWidget(notes_label)
+
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+
+        self.release_list = QListWidget()
+        self.release_list.setStyleSheet(
+            "QListWidget { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); "
+            "border-radius: 8px; padding: 4px; color: white; font-size: 13px; }"
+            "QListWidget::item { padding: 8px; border-radius: 4px; }"
+            "QListWidget::item:hover { background: rgba(255,255,255,0.08); }"
+            "QListWidget::item:selected { background: rgba(79,172,254,0.3); }")
+        self.release_list.currentRowChanged.connect(self.on_release_selected)
+        splitter.addWidget(self.release_list)
+
+        self.release_notes = QTextEdit()
+        self.release_notes.setReadOnly(True)
+        self.release_notes.setStyleSheet(
+            "QTextEdit { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.1); "
+            "border-radius: 8px; padding: 12px; color: #ccc; font-size: 13px; }")
+        splitter.addWidget(self.release_notes)
+
+        splitter.setSizes([250, 450])
+        layout.addWidget(splitter, stretch=1)
+
+        self.status_label = QLabel("Нажмите «Проверить» для поиска обновлений")
+        self.status_label.setStyleSheet("color: #666; font-size: 12px;")
+        layout.addWidget(self.status_label)
+
+        QTimer.singleShot(500, self.check_for_updates)
 
     def check_for_updates(self):
-        if self.checked:
-            return
-        self.checked = True
+        self.btn_refresh.setEnabled(False)
+        self.btn_refresh.setText("⟳ Поиск...")
+        self.status_label.setText("Проверка обновлений...")
 
         def task():
             try:
-                url = "https://raw.githubusercontent.com/ludvig2457/SuperLauncher/main/versions.txt"
-                r = requests.get(url, timeout=10)
-                r.raise_for_status()
-                lines = r.text.splitlines()
-
-                versions = []
-                for line in lines:
-                    if "=" in line:
-                        ver, link = line.split("=", 1)
-                        versions.append((ver.strip(), link.strip()))
-
-                if not versions:
-                    QTimer.singleShot(0, lambda: self.status_label.setText("Версии не найдены."))
+                # GitHub Releases API — все релизы
+                url = "https://api.github.com/repos/Ludvig2457Ultra/SuperLauncherMC/releases?per_page=20"
+                resp = requests.get(url, timeout=15,
+                    headers={"Accept": "application/vnd.github.v3+json"})
+                if resp.status_code != 200:
+                    QTimer.singleShot(0, lambda: self.status_label.setText(
+                        f"Ошибка API GitHub: {resp.status_code}"))
                     return
 
-                # сортировка по семантической версии
-                versions.sort(key=lambda x: version.parse(x[0]), reverse=True)
-                latest_version, download_url = versions[0]
+                data = resp.json()
+                releases = []
+                for r in data:
+                    tag = r.get("tag_name", "")
+                    name = r.get("name", tag)
+                    body = r.get("body", "") or ""
+                    published = r.get("published_at", "")[:10]
+                    prerelease = r.get("prerelease", False)
+                    assets = r.get("assets", [])
+                    dl_url = ""
+                    for a in assets:
+                        if a.get("name", "").endswith(".exe"):
+                            dl_url = a.get("browser_download_url", "")
+                            break
+                    if not dl_url:
+                        for a in assets:
+                            if a.get("name", "").endswith(".py"):
+                                dl_url = a.get("browser_download_url", "")
+                                break
+                    try:
+                        v = packaging_version.parse(tag)
+                    except Exception:
+                        continue
+                    releases.append({
+                        "tag": tag, "name": name, "body": body,
+                        "date": published, "prerelease": prerelease,
+                        "dl_url": dl_url, "version": v
+                    })
 
-                if version.parse(latest_version) > version.parse(CURRENT_VERSION):
-                    self.latest_version_info = (latest_version, download_url)
-                    QTimer.singleShot(0, lambda: self.show_update_button(latest_version))
-                else:
-                    QTimer.singleShot(0, lambda: self.status_label.setText("У вас установлена последняя версия."))
+                releases.sort(key=lambda x: x["version"], reverse=True)
+                self.releases = releases
+
+                # Fill list
+                QTimer.singleShot(0, self.populate_release_list)
+
+                # Check for new version
+                current_v = packaging_version.parse(CURRENT_VERSION)
+                for r in releases:
+                    if r["version"] > current_v and r["dl_url"]:
+                        self.download_url = r["dl_url"]
+                        self.download_version = r["tag"]
+                        QTimer.singleShot(0, lambda v=r: self.show_update(v))
+                        return
+
+                QTimer.singleShot(0, self.show_up_to_date)
 
             except Exception as e:
                 QTimer.singleShot(0, lambda: self.status_label.setText(f"Ошибка: {e}"))
+            finally:
+                QTimer.singleShot(0, lambda: self.btn_refresh.setEnabled(True))
+                QTimer.singleShot(0, lambda: self.btn_refresh.setText("⟳ Проверить"))
 
         from threading import Thread
         Thread(target=task, daemon=True).start()
 
-    def show_update_button(self, version):
-        self.status_label.setText(f"Доступна новая версия: {version}")
-        self.update_button.setVisible(True)
+    def populate_release_list(self):
+        self.release_list.blockSignals(True)
+        self.release_list.clear()
+        for r in self.releases:
+            badge = " 🔧" if r["prerelease"] else ""
+            text = f"{r['tag']}{badge}  {r['date']}"
+            item = QListWidgetItem(text)
+            item.setData(Qt.ItemDataRole.UserRole, r["tag"])
+            if r["prerelease"]:
+                item.setForeground(QColor("#ff9800"))
+            else:
+                item.setForeground(QColor("white"))
+            self.release_list.addItem(item)
+        self.release_list.blockSignals(False)
+        if self.releases:
+            self.release_list.setCurrentRow(0)
 
-    def download_latest(self):
-        if not self.latest_version_info:
+    def on_release_selected(self, row):
+        if row < 0 or row >= len(self.releases):
+            return
+        r = self.releases[row]
+        body = r.get("body", "Нет описания.")
+        # Strip HTML, keep markdown-ish
+        import html
+        safe_body = html.escape(body)
+        # Simple markdown-like rendering
+        lines = safe_body.split("\n")
+        html_lines = []
+        for line in lines:
+            if line.startswith("## "):
+                html_lines.append(f"<h3 style='color:#4facfe;'>{line[3:]}</h3>")
+            elif line.startswith("### "):
+                html_lines.append(f"<h4 style='color:#81c784;'>{line[4:]}</h4>")
+            elif line.startswith("- ") or line.startswith("* "):
+                html_lines.append(f"• {line[2:]}")
+            elif line.startswith("**") and line.endswith("**"):
+                html_lines.append(f"<b>{line[2:-2]}</b>")
+            else:
+                html_lines.append(line)
+        html_content = "<br>".join(html_lines)
+        header = f"<h2 style='color:white;'>{r['tag']}</h2>"
+        meta = f"<p style='color:#888; font-size:12px;'>{r['date']}" + \
+               (" | 🔧 Предрелиз</p>" if r["prerelease"] else "</p>")
+        self.release_notes.setHtml(header + meta + "<hr>" + html_content)
+
+    def show_update(self, release):
+        self.update_card.setVisible(True)
+        self.uc_title.setText(f"Доступна версия {release['tag']}")
+        self.uc_badge.setText("НОВОЕ")
+        # First line of body as summary
+        body = release.get("body", "")
+        summary = body.split("\n")[0] if body else "Обновление доступно для скачивания."
+        if len(summary) > 120:
+            summary = summary[:117] + "..."
+        self.uc_changelog.setText(summary)
+        self.vc_status.setText(f"⬆ Доступно обновление: {release['tag']}")
+        self.vc_status.setStyleSheet("color: #4caf50; font-size: 13px; font-weight: bold;")
+
+    def show_up_to_date(self):
+        self.vc_status.setText("✓ Установлена последняя версия")
+        self.vc_status.setStyleSheet("color: #4caf50; font-size: 13px; font-weight: bold;")
+        self.status_label.setText(f"Последняя проверка: {datetime.datetime.now().strftime('%H:%M:%S')}")
+
+    def start_download(self):
+        if not self.download_url or not self.download_version:
             return
 
-        latest_version, download_url = self.latest_version_info
-        downloads_path = Path(__file__).parent
-        filename = downloads_path / f"SuperLauncher{latest_version}.exe"
+        filename = Path(__file__).parent / f"SuperLauncher_{self.download_version}.exe"
+        self.btn_download.setEnabled(False)
+        self.btn_download.setText("⏳ Загрузка...")
+        self.download_progress.setVisible(True)
+        self.download_progress.setValue(0)
+        self.download_speed.setVisible(True)
+        self.download_speed.setText("Подготовка...")
+        self.status_label.setText(f"Загрузка {self.download_version}...")
 
-        self.update_button.setEnabled(False)
-        self.status_label.setText(f"Загрузка версии {latest_version}...")
+        self.dl_thread = UpdateDownloadThread(self.download_url, str(filename))
+        self.dl_thread.progress.connect(self.download_progress.setValue)
+        self.dl_thread.speed.connect(self.download_speed.setText)
+        self.dl_thread.finished.connect(self.on_download_finished)
+        self.dl_thread.start()
 
-        self.progress_dialog = QDialog(self)
-        self.progress_dialog.setWindowTitle(f"Загрузка {latest_version}")
-        layout = QVBoxLayout(self.progress_dialog)
-        self.progress_bar = QProgressBar()
-        layout.addWidget(self.progress_bar)
-        self.progress_dialog.show()
+    def on_download_finished(self, result):
+        self.download_progress.setVisible(False)
+        self.download_speed.setVisible(False)
+        self.btn_download.setEnabled(True)
+        self.btn_download.setText("⬇ Скачать и установить")
 
-        self.download_thread = UpdateDownloadThread(download_url, str(filename))
-        self.download_thread.progress.connect(self.progress_bar.setValue)
-        self.download_thread.finished.connect(lambda result: self.finish_update(result))
-        self.download_thread.start()
-
-    def finish_update(self, result):
-        self.progress_dialog.hide()
         if result.startswith("ERROR:"):
             QMessageBox.critical(self, "Ошибка", result)
-            self.update_button.setEnabled(True)
+            self.status_label.setText("Ошибка загрузки")
             return
 
-        subprocess.Popen([str(result)], close_fds=True)
-        QApplication.quit()
+        reply = QMessageBox.question(self, "Обновление",
+            f"Версия {self.download_version} загружена.\n"
+            "Запустить установку? Текущий лаунчер закроется.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply == QMessageBox.StandardButton.Yes:
+            subprocess.Popen([result], close_fds=True)
+            QApplication.quit()
 
 
 class CreateServerDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.config = load_config()  # Загружаем текущие настройки (например, язык)
-
+        self.config = load_config()
         self.setWindowTitle(self.tr("Create your own server"))
-        self.setFixedSize(350, 220)
+        self.setFixedSize(400, 300)
 
         layout = QFormLayout(self)
 
@@ -3160,15 +4164,33 @@ class CreateServerDialog(QDialog):
         self.input_port.setText("25565")
 
         self.combo_version = QComboBox()
-        self.combo_version.addItems(["1.20.4", "1.20.1", "1.19.4"])  # Можно расширить
+        self.combo_version.setMinimumContentsLength(12)
 
         self.combo_core = QComboBox()
-        self.combo_core.addItems(["Paper", "Purpur", "Vanilla"])
+        self.combo_core.addItems(["Paper", "Purpur", "Vanilla", "Fabric", "Quilt"])
+        self.combo_core.currentTextChanged.connect(self.on_core_changed)
+
+        self.ram_slider = QSlider(Qt.Orientation.Horizontal)
+        self.ram_slider.setMinimum(1)
+        self.ram_slider.setMaximum(16)
+        self.ram_slider.setValue(4)
+        self.ram_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.ram_slider.setTickInterval(1)
+        self.ram_slider.valueChanged.connect(self.on_ram_changed)
+        self.ram_label = QLabel(f"4 {self.tr('RAM (GB):')}")
+        self.ram_label.setStyleSheet("font-size: 12px; color: #ccc;")
+
+        ram_widget = QWidget()
+        ram_layout = QVBoxLayout(ram_widget)
+        ram_layout.setContentsMargins(0, 0, 0, 0)
+        ram_layout.addWidget(self.ram_slider)
+        ram_layout.addWidget(self.ram_label)
 
         layout.addRow(self.tr("Server Name") + ":", self.input_name)
         layout.addRow(self.tr("Port") + ":", self.input_port)
         layout.addRow(self.tr("Version") + ":", self.combo_version)
         layout.addRow(self.tr("Core") + ":", self.combo_core)
+        layout.addRow(self.tr("RAM (GB):") + ":", ram_widget)
 
         btn_layout = QHBoxLayout()
         self.btn_create = QPushButton(self.tr("Create"))
@@ -3180,22 +4202,70 @@ class CreateServerDialog(QDialog):
         self.btn_create.clicked.connect(self.create_server)
         self.btn_cancel.clicked.connect(self.reject)
 
+        self.fetch_versions()
+
     def tr(self, key: str) -> str:
         lang = self.config.get("language", "ru")
         return translations.get(lang, {}).get(key, key)
 
     def refresh_language(self):
         self.setWindowTitle(self.tr("Create your own server"))
+        layout = self.layout()
         self.input_name.setPlaceholderText(self.tr("Server Name"))
         self.input_port.setPlaceholderText(self.tr("Port (e.g., 25565)"))
-        # Обновляем подписи полей
-        layout: QFormLayout = self.layout()
-        layout.labelForField(self.input_name).setText(self.tr("Server Name") + ":")
-        layout.labelForField(self.input_port).setText(self.tr("Port") + ":")
-        layout.labelForField(self.combo_version).setText(self.tr("Version") + ":")
-        layout.labelForField(self.combo_core).setText(self.tr("Core") + ":")
+        if layout.labelForField(self.input_name):
+            layout.labelForField(self.input_name).setText(self.tr("Server Name") + ":")
+        if layout.labelForField(self.input_port):
+            layout.labelForField(self.input_port).setText(self.tr("Port") + ":")
+        if layout.labelForField(self.combo_version):
+            layout.labelForField(self.combo_version).setText(self.tr("Version") + ":")
+        if layout.labelForField(self.combo_core):
+            layout.labelForField(self.combo_core).setText(self.tr("Core") + ":")
+        if layout.labelForField(self.ram_slider):
+            layout.labelForField(self.ram_slider).setText(self.tr("RAM (GB):") + ":")
         self.btn_create.setText(self.tr("Create"))
         self.btn_cancel.setText(self.tr("Cancel"))
+        self.on_ram_changed(self.ram_slider.value())
+
+    def on_ram_changed(self, val):
+        self.ram_label.setText(f"{val} GB")
+
+    def on_core_changed(self, core):
+        self.fetch_versions()
+
+    def fetch_versions(self):
+        self.combo_version.clear()
+        self.combo_version.addItem(self.tr("Loading..."))
+        from threading import Thread
+        core = self.combo_core.currentText().lower()
+
+        def task():
+            try:
+                versions = []
+                if core in ("paper", "purpur"):
+                    if core == "paper":
+                        resp = requests.get("https://api.papermc.io/v2/projects/paper", timeout=10)
+                        versions = resp.json().get("versions", [])
+                    elif core == "purpur":
+                        resp = requests.get("https://api.purpurmc.org/v2/purpur", timeout=10)
+                        versions = list(resp.json().get("versions", {}).keys())
+                    versions = sorted(versions, key=lambda x: [int(p) if p.isdigit() else p for p in x.split(".")], reverse=True)
+                elif core in ("vanilla", "fabric", "quilt"):
+                    resp = requests.get("https://launchermeta.mojang.com/mc/game/version_manifest.json", timeout=10)
+                    manifest = resp.json()
+                    versions = [v["id"] for v in manifest["versions"] if v["type"] == "release"]
+                    versions.sort(key=lambda x: [int(p) if p.isdigit() else p for p in x.split(".")], reverse=True)
+                if versions:
+                    self.combo_version.clear()
+                    self.combo_version.addItems(versions)
+                else:
+                    self.combo_version.clear()
+                    self.combo_version.addItem("1.20.4")
+            except Exception:
+                self.combo_version.clear()
+                self.combo_version.addItems(["1.20.4", "1.20.1", "1.19.4"])
+
+        Thread(target=task, daemon=True).start()
 
     def create_server(self):
         name = self.input_name.text().strip()
@@ -3211,11 +4281,12 @@ class CreateServerDialog(QDialog):
         self.server_port = int(port)
         self.server_version = version
         self.server_core = core
+        self.ram_gb = self.ram_slider.value()
         self.accept()
 
 
 class DownloadThread(QThread):
-    progress_changed = pyqtSignal(int)  # проценты
+    progress_changed = pyqtSignal(int)
     finished = pyqtSignal()
     error = pyqtSignal(str)
 
@@ -3276,56 +4347,320 @@ class DownloadThread(QThread):
             version_json = requests.get(version_data["url"]).json()
             return version_json["downloads"]["server"]["url"]
 
+        elif core == "fabric":
+            loader_ver = requests.get("https://meta.fabricmc.net/v2/versions/loader", timeout=10).json()
+            installer_ver = requests.get("https://meta.fabricmc.net/v2/versions/installer", timeout=10).json()
+            loader = loader_ver[0]["version"]
+            installer = installer_ver[0]["version"]
+            return f"https://meta.fabricmc.net/v2/versions/loader/{version}/{loader}/{installer}/server/jar"
+
+        elif core == "quilt":
+            meta = requests.get("https://meta.quiltmc.org/v3/versions/loader", timeout=10).json()
+            loader = meta[0]["version"]
+            installer = requests.get("https://meta.quiltmc.org/v3/versions/installer", timeout=10).json()[0]["version"]
+            return f"https://meta.quiltmc.org/v3/downloads/installer/installer-{installer}.jar"
+
         else:
             raise Exception(f"Ядро {core} не поддерживается")
 
 
+class PluginInstallThread(QThread):
+    progress = pyqtSignal(int)
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+
+    def __init__(self, slug, game_version, loader, plugins_folder):
+        super().__init__()
+        self.slug = slug
+        self.game_version = game_version
+        self.loader = loader
+        self.plugins_folder = plugins_folder
+
+    def run(self):
+        try:
+            url = f"{MODRINTH_API}/project/{self.slug}/version"
+            headers = {"User-Agent": "SuperLauncher/2.0"}
+            resp = requests.get(url, headers=headers, timeout=15)
+            resp.raise_for_status()
+            versions = resp.json()
+
+            loaders_to_try = [self.loader]
+            if self.loader == "paper":
+                loaders_to_try.append("bukkit")
+            elif self.loader == "purpur":
+                loaders_to_try.extend(["bukkit", "paper"])
+            elif self.loader == "bukkit":
+                loaders_to_try.extend(["paper", "purpur"])
+
+            match = None
+            for v in versions:
+                gv = v.get("game_versions", [])
+                loaders = v.get("loaders", [])
+                if (not self.game_version or self.game_version in gv) and any(l in loaders for l in loaders_to_try):
+                    match = v
+                    break
+            if not match:
+                self.error.emit(f"No version found for {self.game_version or 'any'} / {self.loader}")
+                return
+
+            files = match.get("files", [])
+            if not files:
+                self.error.emit("No files in version")
+                return
+
+            file_info = files[0]
+            dl_url = file_info.get("url")
+            filename = file_info.get("filename", f"{self.slug}.jar")
+            save_path = os.path.join(self.plugins_folder, filename)
+
+            r = requests.get(dl_url, stream=True, timeout=30)
+            r.raise_for_status()
+            total = int(r.headers.get("content-length", 0))
+            downloaded = 0
+            with open(save_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=8192):
+                    if chunk:
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        if total > 0:
+                            self.progress.emit(int(downloaded * 100 / total))
+            self.finished.emit(save_path)
+        except Exception as e:
+            self.error.emit(str(e))
+
+
+class ServerProcessThread(QThread):
+    output_line = pyqtSignal(str)
+    started = pyqtSignal()
+    stopped = pyqtSignal()
+    error = pyqtSignal(str)
+
+    def __init__(self, server_path, start_command, ram_gb=4):
+        super().__init__()
+        self.server_path = server_path
+        self.start_command = start_command
+        self.ram_gb = ram_gb
+        self.process = None
+        self._running = False
+
+    def run(self):
+        bat_path = os.path.join(self.server_path, "start.bat")
+        try:
+            with open(bat_path, "w", encoding="utf-8") as f:
+                f.write(f"""@echo off
+java -Xmx{self.ram_gb}G -Xms{self.ram_gb}G -jar server.jar nogui
+""")
+            self.process = subprocess.Popen(
+                bat_path, cwd=self.server_path, shell=True,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                text=True, encoding="utf-8", errors="replace"
+            )
+            self._running = True
+            self.started.emit()
+            for line in iter(self.process.stdout.readline, ""):
+                if not self._running:
+                    break
+                if line:
+                    self.output_line.emit(line.rstrip("\r\n"))
+            self.process.wait()
+        except Exception as e:
+            self.error.emit(str(e))
+        finally:
+            self._running = False
+            self.stopped.emit()
+
+    def start_server(self):
+        if not self.isRunning():
+            self.start()
+
+    def stop_server(self):
+        self._running = False
+        if self.process and self.process.poll() is None:
+            try:
+                self.process.stdin.write("stop\n")
+                self.process.stdin.flush()
+            except Exception:
+                pass
+            try:
+                self.process.wait(timeout=10)
+            except Exception:
+                try:
+                    self.process.kill()
+                except Exception:
+                    pass
+
+    def send_command(self, cmd):
+        if self.process and self.process.poll() is None:
+            try:
+                self.process.stdin.write(cmd + "\n")
+                self.process.stdin.flush()
+            except Exception:
+                pass
+
+
 class ServerControlDialog(QDialog):
-    def __init__(self, server_name, server_path, parent=None):
+    def __init__(self, server_name, server_path, ram_gb=4, server_version='', server_core='', parent=None):
         super().__init__(parent)
         self.config = load_config()
+        self.server_name = server_name
         self.server_path = server_path
-        self.process = None
+        self.ram_gb = ram_gb
+        self.server_version = server_version
+        self.server_core = server_core
+        self.server_thread = ServerProcessThread(server_path, "", ram_gb)
         self.playit_process = None
+        self.plugin_install_thread = None
 
         self.setWindowTitle(self.tr("Manage server") + f" '{server_name}'")
-        self.setFixedSize(350, 300)
+        self.resize(700, 500)
+        self.setMinimumSize(600, 400)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
 
-        layout = QVBoxLayout(self)
+        main_layout = QVBoxLayout(self)
+        self.tabs = QTabWidget()
+        main_layout.addWidget(self.tabs)
 
-        self.label = QLabel(self.tr("Managing server: ") + server_name)
-        self.label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(self.label)
+        # -- Console tab --
+        self.console_tab = QWidget()
+        console_layout = QVBoxLayout(self.console_tab)
 
-        # Чекбоксы
-        self.checkbox_eula = QCheckBox(self.tr("I accept the EULA license agreement"))
-        layout.addWidget(self.checkbox_eula)
-
-        self.checkbox_offline = QCheckBox(self.tr("Enable offline mode (pirate)"))
-        layout.addWidget(self.checkbox_offline)
-
-        self.checkbox_playit = QCheckBox(self.tr("Use playit.gg (tunnel)"))
-        layout.addWidget(self.checkbox_playit)
-
-        # Кнопка сохранить настройки
-        self.btn_save_settings = QPushButton(self.tr("Save settings"))
-        self.btn_save_settings.clicked.connect(self.save_settings)
-        layout.addWidget(self.btn_save_settings)
-
-        # Кнопки управления сервером
+        btn_row = QHBoxLayout()
         self.btn_start = QPushButton(self.tr("Start server"))
+        self.btn_start.setStyleSheet("background-color: #4caf50; color: white; font-weight: bold; padding: 6px 16px; border-radius: 4px;")
         self.btn_stop = QPushButton(self.tr("Stop server"))
-        self.btn_close = QPushButton(self.tr("Close"))
+        self.btn_stop.setStyleSheet("background-color: #f44336; color: white; font-weight: bold; padding: 6px 16px; border-radius: 4px;")
+        self.btn_stop.setEnabled(False)
+        btn_row.addWidget(self.btn_start)
+        btn_row.addWidget(self.btn_stop)
+        btn_row.addStretch()
+        console_layout.addLayout(btn_row)
 
-        layout.addWidget(self.btn_start)
-        layout.addWidget(self.btn_stop)
-        layout.addWidget(self.btn_close)
+        self.console_output = QTextEdit()
+        self.console_output.setReadOnly(True)
+        self.console_output.setStyleSheet("""
+            background-color: #1a1a2e; color: #00ff00;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 12px; border: 1px solid #333; border-radius: 4px;
+        """)
+        console_layout.addWidget(self.console_output)
+
+        cmd_row = QHBoxLayout()
+        self.cmd_input = QLineEdit()
+        self.cmd_input.setPlaceholderText(self.tr("Enter command..."))
+        self.cmd_input.returnPressed.connect(self.send_console_command)
+        self.btn_send = QPushButton(self.tr("Send"))
+        self.btn_send.clicked.connect(self.send_console_command)
+        cmd_row.addWidget(self.cmd_input)
+        cmd_row.addWidget(self.btn_send)
+        console_layout.addLayout(cmd_row)
+
+        self.tabs.addTab(self.console_tab, self.tr("Console"))
 
         self.btn_start.clicked.connect(self.start_server)
         self.btn_stop.clicked.connect(self.stop_server)
-        self.btn_close.clicked.connect(self.close)
 
-        self.update_buttons()
+        # -- Settings tab --
+        self.settings_tab = QWidget()
+        settings_layout = QVBoxLayout(self.settings_tab)
+
+        self.checkbox_eula = QCheckBox(self.tr("I accept the EULA"))
+        self.checkbox_offline = QCheckBox(self.tr("Enable offline mode (cracked)"))
+        self.checkbox_playit = QCheckBox(self.tr("Use playit.gg (tunnel)"))
+
+        self.spin_max_players = QSpinBox()
+        self.spin_max_players.setRange(1, 100)
+        self.spin_max_players.setValue(20)
+
+        self.motd_edit = QLineEdit("A SuperLauncher Server")
+
+        self.ram_slider = QSlider(Qt.Orientation.Horizontal)
+        self.ram_slider.setMinimum(1)
+        self.ram_slider.setMaximum(16)
+        self.ram_slider.setValue(self.ram_gb)
+        self.ram_slider.setTickPosition(QSlider.TickPosition.TicksBelow)
+        self.ram_slider.setTickInterval(1)
+        self.ram_slider.valueChanged.connect(lambda v: setattr(self, 'ram_gb', v))
+
+        form = QFormLayout()
+        form.addRow(self.tr("EULA") + ":", self.checkbox_eula)
+        form.addRow(self.tr("Offline mode") + ":", self.checkbox_offline)
+        form.addRow(self.tr("Max players") + ":", self.spin_max_players)
+        form.addRow(self.tr("MOTD") + ":", self.motd_edit)
+        form.addRow(self.tr("RAM (GB):") + ":", self.ram_slider)
+        form.addRow(self.tr("playit.gg") + ":", self.checkbox_playit)
+        settings_layout.addLayout(form)
+
+        self.btn_save_settings = QPushButton(self.tr("Save settings"))
+        self.btn_save_settings.setStyleSheet("padding: 6px 16px; font-weight: bold; background-color: #4facfe; color: black; border-radius: 4px;")
+        self.btn_save_settings.clicked.connect(self.save_settings)
+        settings_layout.addWidget(self.btn_save_settings)
+        settings_layout.addStretch()
+
+        self.tabs.addTab(self.settings_tab, self.tr("Settings"))
+
+        # -- Plugins tab --
+        self.plugins_tab = QWidget()
+        plugins_layout = QVBoxLayout(self.plugins_tab)
+
+        search_row = QHBoxLayout()
+        self.plugin_search_input = QLineEdit()
+        self.plugin_search_input.setPlaceholderText(self.tr("Search plugins..."))
+        self.btn_plugin_search = QPushButton(self.tr("Search"))
+        self.btn_plugin_search.clicked.connect(self.search_plugins)
+        search_row.addWidget(self.plugin_search_input)
+        search_row.addWidget(self.btn_plugin_search)
+        plugins_layout.addLayout(search_row)
+
+        self.plugin_results = QListWidget()
+        plugins_layout.addWidget(QLabel(self.tr("Search results:")))
+        plugins_layout.addWidget(self.plugin_results)
+
+        install_row = QHBoxLayout()
+        self.btn_plugin_install = QPushButton(self.tr("Install"))
+        self.btn_plugin_install.clicked.connect(self.install_selected_plugin)
+        install_row.addWidget(self.btn_plugin_install)
+        install_row.addStretch()
+        plugins_layout.addLayout(install_row)
+
+        plugins_layout.addWidget(QLabel(self.tr("Installed plugins:")))
+        self.installed_plugins_list = QListWidget()
+        plugins_layout.addWidget(self.installed_plugins_list)
+
+        uninstall_row = QHBoxLayout()
+        self.btn_plugin_uninstall = QPushButton(self.tr("Uninstall"))
+        self.btn_plugin_uninstall.clicked.connect(self.uninstall_plugin)
+        uninstall_row.addWidget(self.btn_plugin_uninstall)
+        uninstall_row.addStretch()
+        plugins_layout.addLayout(uninstall_row)
+
+        self.tabs.addTab(self.plugins_tab, self.tr("Plugins"))
+        self.refresh_installed_plugins()
+
+        # -- Backup tab --
+        self.backup_tab = QWidget()
+        backup_layout = QVBoxLayout(self.backup_tab)
+
+        self.btn_create_backup = QPushButton(self.tr("Create Backup"))
+        self.btn_create_backup.setStyleSheet("padding: 8px; font-weight: bold; background-color: #ff9800; color: black; border-radius: 4px;")
+        self.btn_create_backup.clicked.connect(self.create_backup)
+        backup_layout.addWidget(self.btn_create_backup)
+
+        backup_layout.addWidget(QLabel(self.tr("Backups:")))
+        self.backup_list = QListWidget()
+        backup_layout.addWidget(self.backup_list)
+
+        self.btn_restore_backup = QPushButton(self.tr("Restore"))
+        self.btn_restore_backup.clicked.connect(self.restore_backup)
+        backup_layout.addWidget(self.btn_restore_backup)
+
+        self.tabs.addTab(self.backup_tab, self.tr("Backup"))
+        self.refresh_backups()
+
+        self.server_thread.output_line.connect(self.on_server_output)
+        self.server_thread.started.connect(self.on_server_started)
+        self.server_thread.stopped.connect(self.on_server_stopped)
+        self.server_thread.error.connect(self.on_server_error)
+
         self.load_settings()
 
     def tr(self, key: str) -> str:
@@ -3333,15 +4668,25 @@ class ServerControlDialog(QDialog):
         return translations.get(lang, {}).get(key, key)
 
     def refresh_language(self):
-        self.setWindowTitle(self.tr("Manage server"))
-        self.label.setText(self.tr("Managing server: ") + os.path.basename(self.server_path))
-        self.checkbox_eula.setText(self.tr("I accept the EULA license agreement"))
-        self.checkbox_offline.setText(self.tr("Enable offline mode (pirate)"))
-        self.checkbox_playit.setText(self.tr("Use playit.gg (tunnel)"))
-        self.btn_save_settings.setText(self.tr("Save settings"))
+        self.setWindowTitle(self.tr("Manage server") + f" '{self.server_name}'")
+        self.tabs.setTabText(0, self.tr("Console"))
+        self.tabs.setTabText(1, self.tr("Settings"))
+        self.tabs.setTabText(2, self.tr("Plugins"))
+        self.tabs.setTabText(3, self.tr("Backup"))
         self.btn_start.setText(self.tr("Start server"))
         self.btn_stop.setText(self.tr("Stop server"))
-        self.btn_close.setText(self.tr("Close"))
+        self.cmd_input.setPlaceholderText(self.tr("Enter command..."))
+        self.btn_send.setText(self.tr("Send"))
+        self.checkbox_eula.setText(self.tr("I accept the EULA"))
+        self.checkbox_offline.setText(self.tr("Enable offline mode (cracked)"))
+        self.checkbox_playit.setText(self.tr("Use playit.gg (tunnel)"))
+        self.btn_save_settings.setText(self.tr("Save settings"))
+        self.plugin_search_input.setPlaceholderText(self.tr("Search plugins..."))
+        self.btn_plugin_search.setText(self.tr("Search"))
+        self.btn_plugin_install.setText(self.tr("Install"))
+        self.btn_plugin_uninstall.setText(self.tr("Uninstall"))
+        self.btn_create_backup.setText(self.tr("Create Backup"))
+        self.btn_restore_backup.setText(self.tr("Restore"))
 
     def load_settings(self):
         eula_path = os.path.join(self.server_path, "eula.txt")
@@ -3350,13 +4695,23 @@ class ServerControlDialog(QDialog):
 
         prop_path = os.path.join(self.server_path, "server.properties")
         online_mode = True
+        max_players = 20
+        motd = "A SuperLauncher Server"
         if os.path.isfile(prop_path):
             with open(prop_path, "r", encoding="utf-8") as f:
                 for line in f:
                     if line.startswith("online-mode="):
                         online_mode = line.strip().split("=")[1].lower() == "true"
-                        break
+                    elif line.startswith("max-players="):
+                        try:
+                            max_players = int(line.strip().split("=")[1])
+                        except Exception:
+                            pass
+                    elif line.startswith("motd="):
+                        motd = line.strip().split("=", 1)[1] if "=" in line else motd
         self.checkbox_offline.setChecked(not online_mode)
+        self.spin_max_players.setValue(max_players)
+        self.motd_edit.setText(motd)
         self.checkbox_playit.setChecked(False)
 
     def save_settings(self):
@@ -3380,31 +4735,72 @@ class ServerControlDialog(QDialog):
             except Exception:
                 pass
         props["online-mode"] = "false" if self.checkbox_offline.isChecked() else "true"
+        props["max-players"] = str(self.spin_max_players.value())
+        props["motd"] = self.motd_edit.text()
 
         try:
             with open(prop_path, "w", encoding="utf-8") as f:
                 for k, v in props.items():
                     f.write(f"{k}={v}\n")
-                if not props:
-                    f.write(f"online-mode={'false' if self.checkbox_offline.isChecked() else 'true'}\n")
         except Exception as e:
             QMessageBox.critical(self, self.tr("Error"), self.tr("Failed to save server.properties") + f":\n{e}")
             return
 
+        self.ram_gb = self.ram_slider.value()
         QMessageBox.information(self, self.tr("Success"), self.tr("Settings saved!"))
 
-    def update_buttons(self):
-        running = self.process is not None and self.process.poll() is None
-        self.btn_start.setEnabled(not running)
-        self.btn_stop.setEnabled(running)
+    def start_server(self):
+        if self.server_thread.isRunning():
+            return
+        if not self.checkbox_eula.isChecked():
+            QMessageBox.warning(self, "EULA", self.tr("You must accept the EULA!"))
+            return
+        self.save_settings()
+        self.console_output.clear()
+        self.console_output.append(self.tr("Starting server..."))
+        if self.checkbox_playit.isChecked():
+            self.start_playit()
+        self.server_thread.ram_gb = self.ram_gb
+        self.server_thread.start_server()
 
+    def stop_server(self):
+        if not self.server_thread.isRunning():
+            return
+        self.console_output.append(self.tr("Stopping server..."))
+        self.server_thread.stop_server()
+        self.stop_playit()
+
+    def send_console_command(self):
+        cmd = self.cmd_input.text().strip()
+        if cmd:
+            self.server_thread.send_command(cmd)
+            self.console_output.append(f"> {cmd}")
+            self.cmd_input.clear()
+
+    def on_server_output(self, line):
+        self.console_output.append(line)
+        scrollbar = self.console_output.verticalScrollBar()
+        scrollbar.setValue(scrollbar.maximum())
+
+    def on_server_started(self):
+        self.btn_start.setEnabled(False)
+        self.btn_stop.setEnabled(True)
+        self.console_output.append(self.tr("Server started."))
+
+    def on_server_stopped(self):
+        self.btn_start.setEnabled(True)
+        self.btn_stop.setEnabled(False)
+        self.console_output.append(self.tr("Server stopped."))
+
+    def on_server_error(self, msg):
+        self.console_output.append(f"[ERROR] {msg}")
+        QMessageBox.critical(self, self.tr("Error"), msg)
+
+    # --- playit.gg ---
     def download_and_install_playit(self):
-        import requests, tempfile
-
         msi_url = "https://github.com/playit-cloud/playit-agent/releases/download/v0.15.26/playit-windows-x86_64-signed.msi"
         temp_dir = tempfile.gettempdir()
         msi_path = os.path.join(temp_dir, "playit-agent.msi")
-
         if not os.path.isfile(msi_path):
             try:
                 response = requests.get(msi_url, stream=True)
@@ -3415,36 +4811,19 @@ class ServerControlDialog(QDialog):
                             f.write(chunk)
                 os.system(f'powershell -Command "Unblock-File -Path \'{msi_path}\'"')
             except Exception as e:
-                QMessageBox.critical(self, self.tr("Download error"),
-                                     self.tr("Failed to download playit MSI") + f":\n{e}")
+                QMessageBox.critical(self, self.tr("Error"), self.tr("Failed to download playit MSI") + f":\n{e}")
                 return False
-
         try:
-            result = subprocess.run(["msiexec", "/i", msi_path, "/quiet", "/qn"], capture_output=True, text=True,
-                                    shell=False)
+            result = subprocess.run(["msiexec", "/i", msi_path, "/quiet", "/qn"], capture_output=True, text=True, shell=False)
             if result.returncode != 0:
-                msg = QMessageBox(self)
-                msg.setIcon(QMessageBox.Icon.Critical)
-                msg.setWindowTitle(self.tr("Installation error"))
-                msg.setText(self.tr(
-                    "Installation failed with code") + f" {result.returncode}:\n{result.stderr.strip()}\n\n" + self.tr(
-                    "Try opening the file manually:"))
-
-                btn_copy = QPushButton(self.tr("Copy MSI path"))
-                btn_copy.clicked.connect(lambda: QApplication.clipboard().setText(msi_path))
-                layout = msg.layout()
-                layout.addWidget(btn_copy, layout.rowCount(), 0, 1, layout.columnCount())
-                msg.exec()
+                QMessageBox.critical(self, self.tr("Error"), self.tr("Installation failed"))
                 return False
-
-            QMessageBox.information(self, self.tr("Installation"), self.tr("Playit-agent installed successfully."))
             return True
         except Exception as e:
-            QMessageBox.critical(self, self.tr("Installation error"), self.tr("Failed to install playit") + f":\n{e}")
+            QMessageBox.critical(self, self.tr("Error"), self.tr("Failed to install playit") + f":\n{e}")
             return False
 
     def start_playit(self):
-        import os, subprocess
         possible_paths = [
             os.path.expandvars(r"%ProgramFiles%\playit\playit.exe"),
             os.path.expandvars(r"%ProgramFiles(x86)%\playit\playit.exe"),
@@ -3452,14 +4831,11 @@ class ServerControlDialog(QDialog):
         ]
         playit_exe = next((p for p in possible_paths if os.path.isfile(p)), None)
         if not playit_exe and not self.download_and_install_playit():
-            QMessageBox.warning(self, "playit.gg", self.tr("playit.exe not found after installation"))
             return False
-
         try:
             self.playit_process = subprocess.Popen([playit_exe], cwd=os.path.dirname(playit_exe))
             return True
-        except Exception as e:
-            QMessageBox.critical(self, self.tr("Playit error"), str(e))
+        except Exception:
             return False
 
     def stop_playit(self):
@@ -3472,54 +4848,155 @@ class ServerControlDialog(QDialog):
             finally:
                 self.playit_process = None
 
-    def start_server(self):
-        import os, subprocess
-        if self.process is None or self.process.poll() is not None:
-            if not self.checkbox_eula.isChecked():
-                QMessageBox.warning(self, "EULA", self.tr("You must accept the EULA!"))
-                return
+    # --- Plugins ---
+    def search_plugins(self):
+        query = self.plugin_search_input.text().strip()
+        if not query:
+            return
+        self.plugin_results.clear()
+        from threading import Thread
 
-            bat_path = os.path.join(self.server_path, "start.bat")
-            if not os.path.isfile(bat_path):
-                QMessageBox.warning(self, self.tr("Error"), self.tr("start.bat not found!"))
-                return
+        category_map = {"paper": "paper", "purpur": "purpur", "vanilla": "bukkit", "fabric": "fabric", "quilt": "quilt"}
+        cat = category_map.get(self.server_core.lower(), "bukkit")
 
+        def task():
             try:
-                self.process = subprocess.Popen(["cmd.exe", "/k", "start.bat"], cwd=self.server_path, shell=True)
-                if self.checkbox_playit.isChecked() and not self.start_playit():
-                    QMessageBox.warning(self, "playit.gg", self.tr("Playit tunnel will not be started."))
-                QMessageBox.information(self, self.tr("Server"), self.tr("Server started."))
-                self.update_buttons()
+                # Modrinth AND facets with project_type:mod + categories:bukkit returns 0 results,
+                # so only use project_type filter for fabric/quilt where it works.
+                if cat in ("fabric", "quilt"):
+                    facets = f'[["project_type:mod"],["categories:{cat}"]]'
+                else:
+                    facets = f'[["categories:{cat}"]]'
+                url = f"{MODRINTH_API}/search?query={urllib.parse.quote(query)}&facets={urllib.parse.quote(facets)}&limit=30"
+                resp = requests.get(url, headers={"User-Agent": "SuperLauncher/2.0"}, timeout=10)
+                resp.raise_for_status()
+                data = resp.json()
+                hits = data.get("hits", [])
+                if not hits:
+                    self.plugin_results.addItem(self.tr("No plugins found"))
+                    return
+                for hit in hits:
+                    title = hit.get("title", "?")
+                    slug = hit.get("slug", "")
+                    downloads = hit.get("downloads", 0)
+                    summary = hit.get("description", "")
+                    if len(summary) > 80:
+                        summary = summary[:77] + "..."
+                    item_text = f"{title} ({slug}) - {downloads} downloads"
+                    item = QListWidgetItem(item_text)
+                    item.setData(Qt.ItemDataRole.UserRole, slug)
+                    self.plugin_results.addItem(item)
             except Exception as e:
-                QMessageBox.critical(self, self.tr("Start error"), str(e))
-        else:
-            QMessageBox.information(self, self.tr("Info"), self.tr("Server is already running."))
-            self.update_buttons()
+                self.plugin_results.addItem(self.tr("Error") + f": {e}")
 
-    def stop_server(self):
-        if self.process and self.process.poll() is None:
-            try:
-                self.process.terminate()
-                self.process.wait(5)
-                self.stop_playit()
-                QMessageBox.information(self, self.tr("Server"), self.tr("Server stopped."))
-            except Exception:
-                self.process.kill()
-                self.stop_playit()
-                QMessageBox.information(self, self.tr("Server"), self.tr("Server forcefully stopped."))
-            finally:
-                self.process = None
-                self.update_buttons()
-        else:
-            QMessageBox.information(self, self.tr("Info"), self.tr("Server is not running."))
-            self.update_buttons()
+        Thread(target=task, daemon=True).start()
+
+    def install_selected_plugin(self):
+        item = self.plugin_results.currentItem()
+        if not item:
+            return
+        slug = item.data(Qt.ItemDataRole.UserRole)
+        if not slug:
+            return
+
+        plugins_folder = os.path.join(self.server_path, "plugins")
+        os.makedirs(plugins_folder, exist_ok=True)
+
+        loader_map = {"paper": "bukkit", "purpur": "bukkit", "vanilla": "bukkit", "fabric": "fabric", "quilt": "quilt"}
+        loader = loader_map.get(self.server_core.lower(), "bukkit")
+        version = self.server_version if self.server_version else ""
+
+        self.plugin_install_thread = PluginInstallThread(slug, version, loader, plugins_folder)
+        self.plugin_install_thread.finished.connect(lambda p: QMessageBox.information(
+            self, self.tr("Install plugin"), self.tr("Plugin installed") + f": {os.path.basename(p)}"))
+        self.plugin_install_thread.finished.connect(lambda p: self.refresh_installed_plugins())
+        self.plugin_install_thread.error.connect(lambda e: QMessageBox.critical(
+            self, self.tr("Error"), self.tr("Downloading plugin...") + f"\n{e}"))
+        self.plugin_install_thread.start()
+
+    def refresh_installed_plugins(self):
+        self.installed_plugins_list.clear()
+        plugins_folder = os.path.join(self.server_path, "plugins")
+        if os.path.isdir(plugins_folder):
+            for f in sorted(os.listdir(plugins_folder)):
+                if f.endswith(".jar"):
+                    self.installed_plugins_list.addItem(f)
+
+    def uninstall_plugin(self):
+        item = self.installed_plugins_list.currentItem()
+        if not item:
+            return
+        filename = item.text()
+        reply = QMessageBox.question(self, self.tr("Uninstall"),
+                                     f"{self.tr('Are you sure?')}\n{filename}",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        filepath = os.path.join(self.server_path, "plugins", filename)
+        try:
+            os.remove(filepath)
+            self.refresh_installed_plugins()
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), str(e))
+
+    # --- Backups ---
+    def create_backup(self):
+        backup_dir = os.path.join(self.server_path, "backups")
+        os.makedirs(backup_dir, exist_ok=True)
+        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = os.path.join(backup_dir, f"backup_{timestamp}.zip")
+
+        try:
+            with zipfile.ZipFile(backup_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for folder_name in ["world", "world_nether", "world_the_end", "plugins", ""]:
+                    folder_path = os.path.join(self.server_path, folder_name)
+                    if not os.path.isdir(folder_path):
+                        continue
+                    for root, dirs, files in os.walk(folder_path):
+                        if "backups" in root.split(os.sep):
+                            continue
+                        for fname in files:
+                            fpath = os.path.join(root, fname)
+                            arcname = os.path.relpath(fpath, self.server_path)
+                            zf.write(fpath, arcname)
+            QMessageBox.information(self, self.tr("Backup"), self.tr("Backup created") + f":\n{backup_path}")
+            self.refresh_backups()
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), str(e))
+
+    def refresh_backups(self):
+        self.backup_list.clear()
+        backup_dir = os.path.join(self.server_path, "backups")
+        if os.path.isdir(backup_dir):
+            for f in sorted(os.listdir(backup_dir), reverse=True):
+                if f.endswith(".zip"):
+                    self.backup_list.addItem(f)
+
+    def restore_backup(self):
+        item = self.backup_list.currentItem()
+        if not item:
+            return
+        filename = item.text()
+        reply = QMessageBox.question(self, self.tr("Restore backup"),
+                                     f"{self.tr('Are you sure?')}\n{filename}",
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        backup_path = os.path.join(self.server_path, "backups", filename)
+        try:
+            with zipfile.ZipFile(backup_path, "r") as zf:
+                zf.extractall(self.server_path)
+            QMessageBox.information(self, self.tr("Restore backup"), self.tr("Backup restored"))
+            self.refresh_installed_plugins()
+        except Exception as e:
+            QMessageBox.critical(self, self.tr("Error"), str(e))
 
 
 class ServersPage(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.parent_window = parent  # для возможности доступа к родителю при переводе
-        self.config = load_config()  # для текущего языка
+        self.parent_window = parent
+        self.config = load_config()
 
         self.servers_file = "servers_list.json"
         self.servers_list = []
@@ -3528,14 +5005,12 @@ class ServersPage(QWidget):
         self.layout.setContentsMargins(15, 15, 15, 15)
         self.layout.setSpacing(10)
 
-        # Заголовок
         self.title_label = QLabel(self.tr("🖧 Minecraft Servers"))
         self.title_label.setStyleSheet(
             "font-size: 26px; font-weight: bold; margin-bottom: 15px; color: white;"
         )
         self.layout.addWidget(self.title_label)
 
-        # Кнопка создания сервера
         self.btn_create_server = QPushButton(self.tr("Create your own server"))
         self.btn_create_server.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
         self.btn_create_server.setStyleSheet(
@@ -3544,7 +5019,6 @@ class ServersPage(QWidget):
         self.btn_create_server.clicked.connect(self.open_create_server_dialog)
         self.layout.addWidget(self.btn_create_server)
 
-        # Форма добавления сервера вручную
         form_layout = QHBoxLayout()
         self.input_name = QLineEdit()
         self.input_name.setPlaceholderText(self.tr("Server Name"))
@@ -3553,6 +5027,9 @@ class ServersPage(QWidget):
 
         self.btn_add_server = QPushButton(self.tr("Add server"))
         self.btn_add_server.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+        self.btn_add_server.setStyleSheet(
+            "padding: 6px 12px; font-weight: bold; background-color: #4CAF50; color: white; border-radius: 5px;"
+        )
         self.btn_add_server.clicked.connect(self.add_server)
 
         form_layout.addWidget(self.input_name)
@@ -3560,29 +5037,27 @@ class ServersPage(QWidget):
         form_layout.addWidget(self.btn_add_server)
         self.layout.addLayout(form_layout)
 
-        # Прогрессбар
         self.progress_bar = QProgressBar()
         self.progress_bar.setValue(0)
         self.progress_bar.hide()
         self.layout.addWidget(self.progress_bar)
 
-        # Скролл для серверов
         self.scroll_area = QScrollArea()
         self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setStyleSheet("QScrollArea { border: none; background: transparent; }")
         self.layout.addWidget(self.scroll_area)
 
         self.container = QWidget()
+        self.container.setStyleSheet("background: transparent;")
         self.scroll_area.setWidget(self.container)
         self.container_layout = QVBoxLayout(self.container)
         self.container_layout.setContentsMargins(0, 0, 0, 0)
-        self.container_layout.setSpacing(12)
+        self.container_layout.setSpacing(8)
 
         self.load_servers()
         self.update_servers_ui()
 
-    # --- Перевод ---
     def tr(self, key: str) -> str:
-        # если есть родитель с tr — используем его
         if self.parent_window and hasattr(self.parent_window, "tr"):
             return self.parent_window.tr(key)
         lang = self.config.get("language", "ru")
@@ -3596,7 +5071,6 @@ class ServersPage(QWidget):
         self.btn_add_server.setText(self.tr("Add server"))
         self.update_servers_ui()
 
-    # --- Методы сервера ---
     def open_create_server_dialog(self):
         dialog = CreateServerDialog(self)
         if dialog.exec() == QDialog.DialogCode.Accepted:
@@ -3604,6 +5078,7 @@ class ServersPage(QWidget):
             port = dialog.server_port
             version = dialog.server_version
             core = dialog.server_core
+            ram_gb = dialog.ram_gb
             ip = f"localhost:{port}"
 
             server_path = os.path.join("servers", name)
@@ -3614,15 +5089,15 @@ class ServersPage(QWidget):
 
             self.download_thread = DownloadThread(core, version, os.path.join(server_path, "server.jar"))
             self.download_thread.progress_changed.connect(self.progress_bar.setValue)
-            self.download_thread.finished.connect(lambda: self.on_download_finished(name, ip, server_path))
+            self.download_thread.finished.connect(lambda: self.on_download_finished(name, ip, server_path, ram_gb, version, core))
             self.download_thread.error.connect(self.on_download_error)
             self.download_thread.start()
 
-    def on_download_finished(self, name, ip, server_path):
+    def on_download_finished(self, name, ip, server_path, ram_gb=4, version='', core=''):
         self.progress_bar.hide()
-        self.generate_start_bat(server_path)
+        self.generate_start_bat(server_path, ram_gb)
 
-        self.servers_list.append({"name": name, "ip": ip, "managed": True})
+        self.servers_list.append({"name": name, "ip": ip, "managed": True, "ram_gb": ram_gb, "version": version, "core": core})
         self.save_servers()
         self.update_servers_ui()
 
@@ -3636,14 +5111,12 @@ class ServersPage(QWidget):
         self.progress_bar.hide()
         QMessageBox.critical(self, self.tr("Error"), error_message)
 
-    def generate_start_bat(self, path):
+    def generate_start_bat(self, path, ram_gb=4):
         with open(os.path.join(path, "start.bat"), "w", encoding="utf-8") as f:
-            f.write("""@echo off
-java -Xmx2G -Xms2G -jar server.jar nogui
-pause
+            f.write(f"""@echo off
+java -Xmx{ram_gb}G -Xms{ram_gb}G -jar server.jar nogui
 """)
 
-    # --- Работа с JSON ---
     def load_servers(self):
         try:
             with open(self.servers_file, "r", encoding="utf-8") as f:
@@ -3658,7 +5131,6 @@ pause
         except Exception as e:
             print("Error saving servers:", e)
 
-    # --- Добавление сервера вручную ---
     def add_server(self):
         name = self.input_name.text().strip()
         ip = self.input_ip.text().strip()
@@ -3678,7 +5150,6 @@ pause
         self.input_name.clear()
         self.input_ip.clear()
 
-    # --- Обновление UI серверов ---
     def update_servers_ui(self):
         while self.container_layout.count():
             item = self.container_layout.takeAt(0)
@@ -3687,41 +5158,78 @@ pause
                 widget.deleteLater()
 
         for server in self.servers_list:
-            self.add_server_widget(server['name'], server['ip'], server.get('managed', False))
+            self.add_server_widget(server['name'], server['ip'], server.get('managed', False), server.get('ram_gb', 4), server.get('version', ''), server.get('core', ''))
 
         self.container_layout.addStretch()
 
-    def add_server_widget(self, name, ip, managed):
-        container = QWidget()
-        layout = QHBoxLayout(container)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(10)
+    def add_server_widget(self, name, ip, managed, ram_gb=4, version='', core=''):
+        card = QFrame()
+        card.setStyleSheet("""
+            QFrame {
+                background: rgba(40, 40, 55, 0.9);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 10px;
+                padding: 8px;
+            }
+        """)
+        card_layout = QHBoxLayout(card)
+        card_layout.setContentsMargins(12, 8, 12, 8)
+        card_layout.setSpacing(10)
 
-        server_label = QLabel(f"<b>{name}</b> — <span style='color:#4facfe;'>{ip}</span>")
-        server_label.setWordWrap(True)
-        server_label.setStyleSheet("font-size: 16px; color: #c0c0c0;")
-        layout.addWidget(server_label)
-        layout.addStretch()
+        icon_label = QLabel("🖧")
+        icon_label.setStyleSheet("font-size: 24px;")
+        card_layout.addWidget(icon_label)
+
+        info_widget = QWidget()
+        info_layout = QVBoxLayout(info_widget)
+        info_layout.setContentsMargins(0, 0, 0, 0)
+        info_layout.setSpacing(2)
+
+        name_label = QLabel(f"<b>{name}</b>")
+        name_label.setStyleSheet("font-size: 16px; color: white;")
+        info_layout.addWidget(name_label)
+
+        ip_label = QLabel(f"<span style='color:#4facfe;'>{ip}</span>")
+        ip_label.setStyleSheet("font-size: 13px;")
+        info_layout.addWidget(ip_label)
+
+        badge_text = self.tr("Managed") if managed else self.tr("Manual")
+        badge_color = "#4caf50" if managed else "#ff9800"
+        badge = QLabel(f"<span style='background:{badge_color}; color:white; padding:2px 8px; border-radius:3px; font-size:11px;'>{badge_text}</span>")
+        badge.setStyleSheet("font-size: 11px;")
+        info_layout.addWidget(badge)
+
+        card_layout.addWidget(info_widget)
+        card_layout.addStretch()
+
+        btn_style = "padding: 5px 12px; font-weight: bold; border-radius: 5px; font-size: 12px;"
 
         if managed:
-            btn_manage = QPushButton(self.tr("Manage"))
-            btn_manage.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-            btn_manage.setStyleSheet("padding: 4px 12px; font-weight: bold;")
+            btn_console = QPushButton(self.tr("Console"))
+            btn_console.setStyleSheet(f"{btn_style} background-color: #4facfe; color: black;")
+            btn_console.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
             server_path = os.path.join("servers", name)
-            btn_manage.clicked.connect(lambda _, n=name, p=server_path: ServerControlDialog(n, p, self).exec())
-            layout.addWidget(btn_manage)
+            btn_console.clicked.connect(lambda checked, n=name, p=server_path, r=ram_gb, v=version, c=core: self.open_console(n, p, r, v, c))
+            card_layout.addWidget(btn_console)
+
+            btn_open = QPushButton(self.tr("Open folder"))
+            btn_open.setStyleSheet(f"{btn_style} background-color: #607d8b; color: white;")
+            btn_open.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
+            btn_open.clicked.connect(lambda checked, p=server_path: os.startfile(p) if hasattr(os, 'startfile') else None)
+            card_layout.addWidget(btn_open)
 
         btn_delete = QPushButton(self.tr("Delete"))
+        btn_delete.setStyleSheet(f"{btn_style} background-color: #f44336; color: white;")
         btn_delete.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        btn_delete.setStyleSheet(
-            "background-color: #fe4c4c; color: white; border-radius: 5px; padding: 3px 8px;"
-        )
-        btn_delete.clicked.connect(lambda _, n=name, m=managed: self.delete_server(n, m))
-        layout.addWidget(btn_delete)
+        btn_delete.clicked.connect(lambda checked, n=name, m=managed: self.delete_server(n, m))
+        card_layout.addWidget(btn_delete)
 
-        self.container_layout.addWidget(container)
+        self.container_layout.addWidget(card)
 
-    # --- Удаление сервера ---
+    def open_console(self, server_name, server_path, ram_gb=4, version='', core=''):
+        dialog = ServerControlDialog(server_name, server_path, ram_gb, version, core, self)
+        dialog.exec()
+
     def delete_server(self, server_name, managed):
         reply = QMessageBox.question(
             self,
@@ -3746,41 +5254,29 @@ pause
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("SuperLauncher 2026 Edition v2.0.0 🎄")
+        self.setWindowTitle("SuperLauncher 2026 Edition v2.0.0")
         self.setWindowIcon(QIcon("assets/icon.png"))
 
-        # Устанавливаем начальное разрешение 1080x720
-        # Но разрешаем растягивание
         self.resize(1080, 720)
-        self.setMinimumSize(800, 600)  # Минимальный размер
-        self.setMaximumSize(1920, 1080)  # Максимальный размер
-        
-        # Новые системы
+        self.setMinimumSize(800, 600)
+        self.setMaximumSize(1920, 1080)
+
         self.account_system = AccountSystem()
-        self.holiday_theme = HolidayTheme()
-        self.gift_system = GiftSystem(self.account_system)
         self.skins_manager = SkinsManager(self.account_system)
         self.builds_manager = BuildsManager()
         self.custom_ui = CustomizableUI()
         self.platform_info = CrossPlatformSupport.get_platform_info()
-        
-        # Применяем праздничную тему
-        if self.holiday_theme.current_holiday:
-            self.holiday_theme.apply_holiday_style(self)
-        
-        # Включаем прозрачность
+
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setStyleSheet("background: transparent;")
-        
-        # Центральный виджет
+
         central_widget = GlassFrame()
         self.setCentralWidget(central_widget)
-        
+
         main_layout = QHBoxLayout(central_widget)
         main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(0)
-        
-        # Боковая панель (создаем после всех страниц)
+
         self.pages = QStackedWidget()
         self.pages.setStyleSheet("""
             QStackedWidget {
@@ -3790,92 +5286,70 @@ class MainWindow(QMainWindow):
                 margin: 5px;
             }
         """)
-        
-        # Сначала создаем ВСЕ страницы в правильном порядке
+
         self.create_all_pages()
-        
-        # Теперь создаем сайдбар, который будет знать о страницах
+
         self.sidebar = ModernSidebar(self)
-        self.update_sidebar_for_holiday()
-        
-        # Проверяем соответствие
+
         self.check_pages_consistency()
-        
+
         main_layout.addWidget(self.sidebar)
         main_layout.addWidget(self.pages)
-        
-        # Потоки
+
         self.launch_thread = LaunchThread()
         self.launch_thread.state_update_signal.connect(self.state_update)
         self.launch_thread.progress_update_signal.connect(self.update_progress)
-        
-        # Discord RPC
+        self.launch_thread.error_signal.connect(self.show_launch_error)
+
         self.discord_rpc_thread = DiscordRPCThread(self)
         self.discord_rpc_thread.start()
-        
-        # Статусбар с дополнительной информацией
+
         self.setup_status_bar()
-        
-        # Проверка входа
+
         self.check_auto_login()
-        
-        # Таймер для проверки подарков
-        self.gift_timer = QTimer()
-        self.gift_timer.timeout.connect(self.check_for_gifts)
-        self.gift_timer.start(60000)  # Каждую минуту
-        
-        # Применяем настройки UI
+
         self.custom_ui.apply_to_widget(self)
-        
-        # Показываем приветственное сообщение
-        QTimer.singleShot(1000, self.show_welcome_message)
     
     def create_all_pages(self):
-        """Создает все страницы в правильном порядке"""
-        # Создаем временный список для страниц
         pages_list = []
-        
+
         # 0 - Главная
         pages_list.append(self.create_home_page())
-        
+
         # 1 - Аккаунт
         pages_list.append(self.create_account_page())
-        
-        # 2 - Подарки
-        pages_list.append(self.create_gifts_page())
-        
-        # 3 - Моды
+
+        # 2 - Моды
         pages_list.append(ModsPage(self))
-        
-        # 4 - Сборки
+
+        # 3 - Сборки
         pages_list.append(self.create_builds_page())
-        
-        # 5 - Скины
+
+        # 4 - Скины
         pages_list.append(self.create_skins_page())
-        
-        # 6 - Новости
+
+        # 5 - Новости
         pages_list.append(NewsPage(self))
-        
-        # 7 - Обновления
+
+        # 6 - Обновления
         pages_list.append(UpdatesPage())
-        
-        # 8 - Серверы
+
+        # 7 - Серверы
         pages_list.append(ServersPage(self))
-        
-        # 9 - Настройки
+
+        # 8 - Настройки
         self.settings_page = SettingsPage(self)
         pages_list.append(self.settings_page)
-        
-        # 10 - Minecraft
+
+        # 9 - Minecraft
         minecraft_page = MinecraftLauncherPage()
-        # Заменяем кнопку запуска на анимированную
         if hasattr(minecraft_page, 'start_button'):
             old_button = minecraft_page.start_button
             new_button = AnimatedButton("🎮 Играть")
             new_button.setFixedHeight(50)
             new_button.setStyleSheet("font-size: 18px; font-weight: bold;")
             new_button.clicked.connect(self.launch_game)
-            
+
             layout = minecraft_page.layout()
             for i in range(layout.count()):
                 item = layout.itemAt(i)
@@ -3886,11 +5360,14 @@ class MainWindow(QMainWindow):
                     minecraft_page.start_button = new_button
                     break
         pages_list.append(minecraft_page)
-        
-        # Добавляем все страницы в QStackedWidget
+
+        # 10 - AI Агент
+        self.ai_page = AIAgentPage(self)
+        pages_list.append(self.ai_page)
+
         for page in pages_list:
             self.pages.addWidget(page)
-        
+
         print(f"✅ Создано {len(pages_list)} страниц")
     
     def check_pages_consistency(self):
@@ -3910,77 +5387,34 @@ class MainWindow(QMainWindow):
         print(f"✅ Все в порядке: {button_count} кнопок, {page_count} страниц")
         return True
     
-    def update_sidebar_for_holiday(self):
-        """Обновление боковой панели для праздников"""
-        if self.holiday_theme.current_holiday:
-            assets = self.holiday_theme.get_holiday_assets()
-            if assets:
-                # Обновляем иконки в сайдбаре
-                holiday_icons = {
-                    "home": "🎄",
-                    "account": "🎅",
-                    "gifts": "🎁",
-                    "mods": "🧩",
-                    "builds": "📦",
-                    "skins": "🖼️",
-                    "news": "❄️",
-                    "updates": "🌟",
-                    "servers": "🦌",
-                    "settings": "🔔",
-                    "minecraft": "⛄"
-                }
-                
-                # Обновляем тексты кнопок
-                for i, (icon_key, btn) in enumerate(zip(holiday_icons.keys(), self.sidebar.nav_buttons)):
-                    new_icon = holiday_icons.get(icon_key, btn.property("full_text")[:2])
-                    old_text = btn.property("full_text")
-                    # Сохраняем текст после иконки
-                    text_part = old_text[2:] if len(old_text) > 2 else ""
-                    btn.setProperty("full_text", f"  {new_icon}{text_part}")
-                    btn.setProperty("short_text", f"  {new_icon}")
-                    
-                    # Обновляем отображаемый текст
-                    if self.sidebar.is_expanded:
-                        btn.setText(btn.property("full_text"))
-                    else:
-                        btn.setText(btn.property("short_text"))
-    
+
     def create_home_page(self):
-        """Создание главной страницы для 1080x720"""
         page = QWidget()
         layout = QVBoxLayout(page)
-        layout.setContentsMargins(15, 15, 15, 15)  # Уменьшаем отступы
-        layout.setSpacing(12)  # Уменьшаем расстояние
-        
-        # Новогодний счетчик - уменьшаем
-        self.countdown_widget = NewYearCountdown()
-        layout.addWidget(self.countdown_widget)
-        
-        # Заголовок - уменьшаем
-        title_label = GradientLabel("🎄 SuperLauncher 2026 🎄")
+        layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(12)
+
+        title_label = GradientLabel("SuperLauncher 2026")
         title_label.setStyleSheet("""
-            font-size: 28px;  # Было 36px
-            margin: 8px 0;  # Уменьшаем отступы
+            font-size: 28px;
+            margin: 8px 0;
             font-weight: bold;
             text-align: center;
         """)
         layout.addWidget(title_label)
-        
-        # НА ЭТО:
-        user_info_widget = self.create_user_info_widget_720p()  # Без self.
+
+        user_info_widget = self.create_user_info_widget_720p()
         layout.addWidget(user_info_widget)
-        
-        # И также:
-        quick_actions = self.create_quick_actions_720p()  # Без self.
+
+        quick_actions = self.create_quick_actions_720p()
         layout.addWidget(quick_actions)
-        
+
         layout.addStretch()
         return page
 
     # В классе MainWindow (примерно строка 4012) ЗАМЕНИТЕ:
 
     def create_user_info_widget_720p(self):
-        """Виджет информации о пользователе для 720p"""
         widget = QFrame()
         widget.setStyleSheet("""
             QFrame {
@@ -3990,61 +5424,40 @@ class MainWindow(QMainWindow):
                 padding: 10px;
             }
         """)
-        
+
         layout = QHBoxLayout(widget)
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
-        
-        # Аватар
+
         self.avatar_label = QLabel("👤")
-        self.avatar_label.setStyleSheet("""
-            font-size: 36px;
-            padding: 8px;
-            background-color: rgba(255, 255, 255, 0.1);
-            border-radius: 50%;
-            min-width: 60px;
-            min-height: 60px;
-            text-align: center;
-        """)
+        self.avatar_label.setStyleSheet("font-size: 36px; padding: 8px;"
+            "background-color: rgba(255, 255, 255, 0.1); border-radius: 50%;"
+            "min-width: 60px; min-height: 60px; text-align: center;")
         layout.addWidget(self.avatar_label)
-        
-        # Информация о пользователе
+
         user_info_widget = QWidget()
         user_info_layout = QVBoxLayout(user_info_widget)
         user_info_layout.setContentsMargins(0, 0, 0, 0)
         user_info_layout.setSpacing(5)
-        
+
         self.username_label = QLabel("Гость")
         self.username_label.setStyleSheet("font-size: 16px; font-weight: bold; color: white;")
         user_info_layout.addWidget(self.username_label)
-        
+
         self.user_status_label = QLabel("Не авторизован")
         self.user_status_label.setStyleSheet("font-size: 12px; color: #aaa;")
         user_info_layout.addWidget(self.user_status_label)
-        
+
         layout.addWidget(user_info_widget)
         layout.addStretch()
-        
-        # Кнопка входа
+
         self.login_button = QPushButton("Войти / Зарегистрироваться")
         self.login_button.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.login_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4facfe;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 6px 12px;
-                font-weight: bold;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #3a9bed;
-            }
-        """)
+        self.login_button.setStyleSheet("background-color: #4facfe; color: white; border: none;"
+            "border-radius: 6px; padding: 6px 12px; font-weight: bold; font-size: 12px;")
         self.login_button.clicked.connect(self.show_login_dialog)
         layout.addWidget(self.login_button)
-        
+
         return widget
 
     def create_quick_actions_720p(self):
@@ -4065,10 +5478,9 @@ class MainWindow(QMainWindow):
         
         actions = [
             ("🎮", "Быстрый запуск", self.launch_game),
-            ("🎁", "Подарок", self.claim_daily_gift),
-            ("🛒", "Скины", lambda: self.pages.setCurrentIndex(5)),
-            ("📦", "Сборки", lambda: self.pages.setCurrentIndex(4)),
-            ("⚙️", "Настройки", lambda: self.pages.setCurrentIndex(9)),
+            ("🛒", "Скины", lambda: self.pages.setCurrentIndex(4)),
+            ("📦", "Сборки", lambda: self.pages.setCurrentIndex(3)),
+            ("⚙️", "Настройки", lambda: self.pages.setCurrentIndex(8)),
             ("🆘", "Помощь", self.show_help),
         ]
         
@@ -4368,155 +5780,7 @@ class MainWindow(QMainWindow):
         
         return page
     
-    def create_gifts_page(self):
-        """Создание страницы подарков"""
-        page = QWidget()
-        layout = QVBoxLayout(page)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(15)
-        
-        title = QLabel("🎁 Подарки и Награды")
-        title.setStyleSheet("font-size: 28px; font-weight: bold; margin-bottom: 20px; color: white;")
-        layout.addWidget(title)
-        
-        # Ежедневный подарок
-        daily_group = QGroupBox("🎯 Ежедневный подарок")
-        daily_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 16px;
-                font-weight: bold;
-                color: #FFD700;
-                border: 2px solid #FFD700;
-                border-radius: 10px;
-                margin-top: 10px;
-                padding-top: 15px;
-                background-color: rgba(255, 215, 0, 0.05);
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 10px 0 10px;
-            }
-        """)
-        
-        daily_layout = QVBoxLayout()
-        
-        # Виджет ежедневного подарка
-        daily_gift_widget = QWidget()
-        daily_gift_layout = QHBoxLayout(daily_gift_widget)
-        daily_gift_layout.setContentsMargins(15, 15, 15, 15)
-        
-        # Иконка подарка
-        gift_icon = QLabel("🎁")
-        gift_icon.setStyleSheet("font-size: 64px;")
-        daily_gift_layout.addWidget(gift_icon)
-        
-        # Информация о подарке
-        gift_info = QWidget()
-        gift_info_layout = QVBoxLayout(gift_info)
-        gift_info_layout.setSpacing(5)
-        
-        self.daily_gift_status = QLabel("Готово к получению!")
-        self.daily_gift_status.setStyleSheet("font-size: 18px; font-weight: bold; color: #FFD700;")
-        gift_info_layout.addWidget(self.daily_gift_status)
-        
-        gift_desc = QLabel("Заходите ежедневно, чтобы получать новые подарки!")
-        gift_desc.setStyleSheet("color: #aaaaaa; font-size: 14px;")
-        gift_desc.setWordWrap(True)
-        gift_info_layout.addWidget(gift_desc)
-        
-        daily_gift_layout.addWidget(gift_info)
-        daily_gift_layout.addStretch()
-        
-        daily_layout.addWidget(daily_gift_widget)
-        
-        # Кнопка получения
-        self.claim_daily_btn = QPushButton("🎉 Получить ежедневный подарок!")
-        self.claim_daily_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.claim_daily_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FFD700;
-                color: #333333;
-                border: none;
-                border-radius: 8px;
-                padding: 15px;
-                font-size: 16px;
-                font-weight: bold;
-                margin: 10px;
-            }
-            QPushButton:hover {
-                background-color: #FFC800;
-            }
-            QPushButton:disabled {
-                background-color: #666666;
-                color: #aaaaaa;
-            }
-        """)
-        self.claim_daily_btn.clicked.connect(self.claim_daily_gift)
-        daily_layout.addWidget(self.claim_daily_btn)
-        
-        daily_group.setLayout(daily_layout)
-        layout.addWidget(daily_group)
-        
-        # Полученные подарки
-        received_group = QGroupBox("📜 История подарков")
-        received_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 16px;
-                font-weight: bold;
-                color: #4facfe;
-                border: 2px solid #4facfe;
-                border-radius: 10px;
-                margin-top: 10px;
-                padding-top: 15px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 10px 0 10px;
-            }
-        """)
-        
-        self.gifts_list = QListWidget()
-        self.gifts_list.setStyleSheet("""
-            QListWidget {
-                background-color: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 5px;
-                color: white;
-                font-size: 14px;
-            }
-            QListWidget::item {
-                padding: 10px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            QListWidget::item:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-            QListWidget::item:selected {
-                background-color: rgba(79, 172, 254, 0.3);
-            }
-        """)
-        
-        # Заполняем тестовыми данными
-        test_gifts = [
-            "🎁 25.12.2024: Новогодний скин",
-            "🌟 24.12.2024: 500 XP",
-            "🎄 23.12.2024: Праздничная тема",
-            "✨ 22.12.2024: Редкий ресурс-пак"
-        ]
-        
-        for gift in test_gifts:
-            item = QListWidgetItem(gift)
-            self.gifts_list.addItem(item)
-        
-        received_layout = QVBoxLayout()
-        received_layout.addWidget(self.gifts_list)
-        received_group.setLayout(received_layout)
-        layout.addWidget(received_group)
-        
-        layout.addStretch()
-        return page
+
     
     def create_skins_page(self):
         """Создание страницы скинов"""
@@ -4760,264 +6024,114 @@ class MainWindow(QMainWindow):
         return widget
     
     def create_builds_page(self):
-        """Создание страницы сборок"""
         page = QWidget()
         layout = QVBoxLayout(page)
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
-        
+
+        self.builds_manager = BuildsManager()
+
         title = QLabel("📦 Сборки и Модпаки")
         title.setStyleSheet("font-size: 28px; font-weight: bold; margin-bottom: 20px; color: white;")
         layout.addWidget(title)
-        
-        # Поиск сборок
-        search_widget = QWidget()
-        search_layout = QHBoxLayout(search_widget)
-        search_layout.setContentsMargins(0, 0, 0, 0)
-        search_layout.setSpacing(10)
-        
+
+        # Источник + поиск
+        search_row = QHBoxLayout()
+        self.builds_source = QComboBox()
+        self.builds_source.addItems(["Modrinth", "CurseForge"])
+        self.builds_source.setStyleSheet("background-color: #2f2f2f; color: white; border: 1px solid #444; border-radius: 5px; padding: 3px;")
+        search_row.addWidget(self.builds_source)
+
         self.builds_search = QLineEdit()
         self.builds_search.setPlaceholderText("Введите название сборки...")
-        self.builds_search.setStyleSheet("""
-            QLineEdit {
-                background-color: rgba(255, 255, 255, 0.1);
-                border: 1px solid rgba(255, 255, 255, 0.3);
-                border-radius: 8px;
-                padding: 10px;
-                color: white;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border: 1px solid #4facfe;
-            }
-        """)
-        
+        self.builds_search.setStyleSheet("background-color: #2f2f2f; color: white; border: 1px solid #444; border-radius: 5px; padding: 8px;")
+        self.builds_search.returnPressed.connect(self.search_builds)
+        search_row.addWidget(self.builds_search, 1)
+
         self.builds_search_btn = QPushButton("Поиск")
-        self.builds_search_btn.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        self.builds_search_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4facfe;
-                color: white;
-                border: none;
-                border-radius: 8px;
-                padding: 10px 20px;
-                font-weight: bold;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #3a9bed;
-            }
-        """)
+        self.builds_search_btn.setStyleSheet("background-color: #4facfe; color: white; border: none; border-radius: 5px; padding: 8px 15px; font-weight: bold;")
         self.builds_search_btn.clicked.connect(self.search_builds)
-        
-        search_layout.addWidget(self.builds_search)
-        search_layout.addWidget(self.builds_search_btn)
-        layout.addWidget(search_widget)
-        
-        # Список сборок
+        search_row.addWidget(self.builds_search_btn)
+
+        import_btn = QPushButton("📂 .mrpack")
+        import_btn.setStyleSheet("background-color: #2f2f2f; color: white; border: 1px solid #444; border-radius: 5px; padding: 8px 10px;")
+        import_btn.clicked.connect(self.import_mrpack)
+        search_row.addWidget(import_btn)
+
+        layout.addLayout(search_row)
+
+        # Доступные сборки
         builds_group = QGroupBox("🔍 Доступные сборки")
         builds_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 16px;
-                font-weight: bold;
-                color: #4facfe;
-                border: 2px solid #4facfe;
-                border-radius: 10px;
-                margin-top: 10px;
-                padding-top: 15px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 10px 0 10px;
-            }
+            QGroupBox { font-size: 14px; font-weight: bold; color: #4facfe;
+                border: 1px solid #4facfe; border-radius: 8px; margin-top: 8px; padding-top: 12px; }
+            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 8px; }
         """)
-        
         self.builds_list = QListWidget()
         self.builds_list.setStyleSheet("""
-            QListWidget {
-                background-color: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 5px;
-                color: white;
-                font-size: 14px;
-                min-height: 200px;
-            }
-            QListWidget::item {
-                padding: 12px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            QListWidget::item:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
-            QListWidget::item:selected {
-                background-color: rgba(79, 172, 254, 0.3);
-            }
+            QListWidget { background-color: #2f2f2f; border: 1px solid #444; border-radius: 5px; color: white; font-size: 14px; }
+            QListWidget::item { padding: 10px; border-bottom: 1px solid #444; }
+            QListWidget::item:hover { background-color: #3a3a3a; }
+            QListWidget::item:selected { background-color: rgba(79,172,254,0.3); }
         """)
-        
-        # Добавляем тестовые сборки
-        test_builds = [
-            "Better Minecraft [1.20.1] - 500K+ загрузок",
-            "RLCraft [1.12.2] - 1M+ загрузок",
-            "All The Mods 9 [1.20.1] - 300K+ загрузок",
-            "Medieval Minecraft [1.19.2] - 150K+ загрузок",
-            "SkyFactory 4 [1.12.2] - 800K+ загрузок",
-            "StoneBlock 3 [1.18.2] - 400K+ загрузок"
-        ]
-        
-        for build in test_builds:
-            item = QListWidgetItem(build)
-            self.builds_list.addItem(item)
-        
-        builds_layout = QVBoxLayout()
-        builds_layout.addWidget(self.builds_list)
-        
-        # Кнопки для сборок
-        builds_buttons = QWidget()
-        builds_buttons_layout = QHBoxLayout(builds_buttons)
-        builds_buttons_layout.setContentsMargins(0, 10, 0, 0)
-        
-        btn_install = QPushButton("⬇️ Установить сборку")
-        btn_install.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        btn_install.setStyleSheet("""
-            QPushButton {
-                background-color: #4facfe;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 10px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #3a9bed;
-            }
-        """)
+        self.builds_list.itemDoubleClicked.connect(self.install_selected_build)
+        b_group_layout = QVBoxLayout()
+        b_group_layout.addWidget(self.builds_list)
+        b_btns = QHBoxLayout()
+        btn_install = QPushButton("⬇️ Установить")
+        btn_install.setStyleSheet("background-color: #4facfe; color: white; border: none; border-radius: 5px; padding: 8px 15px; font-weight: bold;")
         btn_install.clicked.connect(self.install_selected_build)
-        
-        btn_info = QPushButton("ℹ️ Информация")
-        btn_info.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        btn_info.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(79, 172, 254, 0.2);
-                color: #4facfe;
-                border: 1px solid #4facfe;
-                border-radius: 5px;
-                padding: 10px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(79, 172, 254, 0.3);
-            }
-        """)
+        btn_info = QPushButton("ℹ️ Инфо")
+        btn_info.setStyleSheet("background-color: #2f2f2f; color: #4facfe; border: 1px solid #4facfe; border-radius: 5px; padding: 8px 15px;")
         btn_info.clicked.connect(self.show_build_info)
-        
-        builds_buttons_layout.addWidget(btn_install)
-        builds_buttons_layout.addWidget(btn_info)
-        builds_buttons_layout.addStretch()
-        
-        builds_layout.addWidget(builds_buttons)
-        builds_group.setLayout(builds_layout)
-        layout.addWidget(builds_group)
-        
+        b_btns.addWidget(btn_install)
+        b_btns.addWidget(btn_info)
+        b_btns.addStretch()
+        b_group_layout.addLayout(b_btns)
+        builds_group.setLayout(b_group_layout)
+        layout.addWidget(builds_group, 1)
+
         # Установленные сборки
-        installed_group = QGroupBox("📁 Установленные сборки")
+        installed_group = QGroupBox("📁 Установленные")
         installed_group.setStyleSheet("""
-            QGroupBox {
-                font-size: 16px;
-                font-weight: bold;
-                color: #4facfe;
-                border: 2px solid #4facfe;
-                border-radius: 10px;
-                margin-top: 10px;
-                padding-top: 15px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 10px 0 10px;
-            }
+            QGroupBox { font-size: 14px; font-weight: bold; color: #4facfe;
+                border: 1px solid #4facfe; border-radius: 8px; margin-top: 8px; padding-top: 12px; }
+            QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 8px; }
         """)
-        
         self.installed_builds_list = QListWidget()
         self.installed_builds_list.setStyleSheet("""
-            QListWidget {
-                background-color: rgba(255, 255, 255, 0.05);
-                border: 1px solid rgba(255, 255, 255, 0.1);
-                border-radius: 5px;
-                color: white;
-                font-size: 14px;
-                min-height: 150px;
-            }
-            QListWidget::item {
-                padding: 10px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            }
-            QListWidget::item:hover {
-                background-color: rgba(255, 255, 255, 0.1);
-            }
+            QListWidget { background-color: #2f2f2f; border: 1px solid #444; border-radius: 5px; color: white; font-size: 14px; }
+            QListWidget::item { padding: 8px; border-bottom: 1px solid #444; }
         """)
-        
-        # Тестовые установленные сборки
-        test_installed = [
-            "Vanilla [1.20.1]",
-            "My Custom Pack [1.19.2]"
-        ]
-        
-        for build in test_installed:
-            item = QListWidgetItem(build)
-            self.installed_builds_list.addItem(item)
-        
-        installed_layout = QVBoxLayout()
-        installed_layout.addWidget(self.installed_builds_list)
-        
-        # Кнопки для установленных сборок
-        installed_buttons = QWidget()
-        installed_buttons_layout = QHBoxLayout(installed_buttons)
-        installed_buttons_layout.setContentsMargins(0, 10, 0, 0)
-        
+        i_group_layout = QVBoxLayout()
+        i_group_layout.addWidget(self.installed_builds_list)
+        i_btns = QHBoxLayout()
         btn_play = QPushButton("🎮 Запустить")
-        btn_play.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        btn_play.setStyleSheet("""
-            QPushButton {
-                background-color: #4facfe;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #3a9bed;
-            }
-        """)
+        btn_play.setStyleSheet("background-color: #4facfe; color: white; border: none; border-radius: 5px; padding: 8px 15px; font-weight: bold;")
         btn_play.clicked.connect(self.play_installed_build)
-        
         btn_remove = QPushButton("🗑️ Удалить")
-        btn_remove.setCursor(QCursor(Qt.CursorShape.PointingHandCursor))
-        btn_remove.setStyleSheet("""
-            QPushButton {
-                background-color: rgba(255, 85, 85, 0.2);
-                color: #ff5555;
-                border: 1px solid #ff5555;
-                border-radius: 5px;
-                padding: 8px 15px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 85, 85, 0.3);
-            }
-        """)
+        btn_remove.setStyleSheet("background-color: #d9534f; color: white; border: none; border-radius: 5px; padding: 8px 15px;")
         btn_remove.clicked.connect(self.remove_installed_build)
-        
-        installed_buttons_layout.addWidget(btn_play)
-        installed_buttons_layout.addWidget(btn_remove)
-        installed_buttons_layout.addStretch()
-        
-        installed_layout.addWidget(installed_buttons)
-        installed_group.setLayout(installed_layout)
+        btn_restore = QPushButton("🔄 Восст. моды")
+        btn_restore.setStyleSheet("background-color: #5bc0de; color: white; border: none; border-radius: 5px; padding: 8px 15px;")
+        btn_restore.clicked.connect(self.restore_mods_backup)
+        btn_dlcf = QPushButton("📥 Докачать моды")
+        btn_dlcf.setStyleSheet("background-color: #f0ad4e; color: white; border: none; border-radius: 5px; padding: 8px 15px;")
+        btn_dlcf.clicked.connect(self.download_missing_cf_mods)
+        btn_clear_cache = QPushButton("🧹 Очистить кэш")
+        btn_clear_cache.setStyleSheet("background-color: #6c757d; color: white; border: none; border-radius: 5px; padding: 8px 15px;")
+        btn_clear_cache.clicked.connect(self.clear_builds_cache)
+        i_btns.addWidget(btn_play)
+        i_btns.addWidget(btn_remove)
+        i_btns.addWidget(btn_restore)
+        i_btns.addWidget(btn_dlcf)
+        i_btns.addWidget(btn_clear_cache)
+        i_btns.addStretch()
+        i_group_layout.addLayout(i_btns)
+        installed_group.setLayout(i_group_layout)
         layout.addWidget(installed_group)
-        
-        layout.addStretch()
+
+        self.refresh_installed_builds()
         return page
     
     def setup_status_bar(self):
@@ -5062,23 +6176,6 @@ class MainWindow(QMainWindow):
         """Обновление времени в статусбаре"""
         current_time = datetime.datetime.now().strftime("%d.%m.%Y %H:%M:%S")
         self.status_time_label.setText(f"🕒 {current_time}")
-    
-    def show_welcome_message(self):
-        """Показать приветственное сообщение"""
-        if self.holiday_theme.current_holiday:
-            holiday_name = {
-                "christmas": "Рождеством",
-                "new_year": "Новым Годом",
-                "new_year_eve": "Новым Годом"
-            }.get(self.holiday_theme.current_holiday, "")
-            
-            if holiday_name:
-                QMessageBox.information(
-                    self,
-                    f"🎄 С {holiday_name}!",
-                    f"SuperLauncher 2026 желает вам счастливого {holiday_name.lower()}!\n\n"
-                    f"Заходите ежедневно за подарками и участвуйте в праздничных ивентах!"
-                )
     
     def check_auto_login(self):
         """Проверка автоматического входа"""
@@ -5131,25 +6228,6 @@ class MainWindow(QMainWindow):
                 "Функция удаления аккаунта находится в разработке."
             )
     
-    def check_for_gifts(self):
-        """Проверка доступных подарков"""
-        if self.account_system.current_user:
-            gift, message = self.gift_system.get_daily_gift()
-            if gift:
-                GiftNotification(gift, self).exec()
-    
-    def claim_daily_gift(self):
-        """Получение ежедневного подарка"""
-        if not self.account_system.current_user:
-            self.show_login_dialog()
-            return
-        
-        gift, message = self.gift_system.get_daily_gift()
-        if gift:
-            GiftNotification(gift, self).exec()
-        else:
-            QMessageBox.information(self, "Подарки", message)
-    
     def apply_skin(self, skin_name):
         """Применение скина"""
         if not self.account_system.current_user:
@@ -5176,7 +6254,7 @@ class MainWindow(QMainWindow):
         if success:
             QMessageBox.information(self, "Успех", message)
             # Обновляем страницу скинов
-            self.pages.setCurrentIndex(5)  # Переходим на страницу скинов
+            self.pages.setCurrentIndex(4)  # Переходим на страницу скинов
         else:
             QMessageBox.warning(self, "Ошибка", message)
     
@@ -5218,105 +6296,345 @@ class MainWindow(QMainWindow):
         else:
             QMessageBox.critical(self, "Ошибка", message)
     
+    def refresh_installed_builds(self):
+        builds_dir = os.path.join(minecraft_directory, "builds")
+        self.installed_builds_list.clear()
+        for pack in self.builds_manager.get_installed_packs(builds_dir):
+            name = pack.get("name", "?")
+            mc = (pack.get("mc_versions") or ["?"])[0]
+            src = pack.get("source", "?")
+            item = QListWidgetItem(f"{name} [{mc}] ({src})")
+            item.setData(Qt.ItemDataRole.UserRole, pack)
+            self.installed_builds_list.addItem(item)
+
     def search_builds(self):
-        """Поиск сборок"""
-        query = self.builds_search.text()
-        if not query.strip():
-            QMessageBox.warning(self, "Предупреждение", "Введите поисковый запрос")
-            return
-        
-        # Здесь будет реальный поиск
-        QMessageBox.information(
-            self,
-            "Поиск",
-            f"Поиск сборок по запросу: '{query}'\n\n"
-            "В реальном приложении здесь будет отображен\n"
-            "результат поиска из Modrinth API."
-        )
-    
+        query = self.builds_search.text().strip()
+        source = self.builds_source.currentText()
+        self.builds_list.clear()
+        try:
+            if source == "Modrinth":
+                results = self.builds_manager.search_modrinth(query)
+            else:
+                results = self.builds_manager.search_curseforge(query)
+            for mp in results:
+                name = mp.get("name", "?")
+                desc = mp.get("description", "")[:80]
+                dl = mp.get("downloads", 0)
+                source_label = mp.get("source", "")
+                item = QListWidgetItem(f"{name} ⬇{dl} — {desc} [{source_label}]")
+                item.setData(Qt.ItemDataRole.UserRole, mp)
+                self.builds_list.addItem(item)
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", str(e))
+
+    def _select_version(self, versions, source):
+        if not versions:
+            return None
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Выберите версию")
+        dialog.setMinimumWidth(400)
+        layout = QVBoxLayout(dialog)
+        combo = QComboBox()
+        ver_map = {}
+        if source == "modrinth":
+            for v in versions:
+                mc = ", ".join(v.get("game_versions", []))
+                loaders = ", ".join(v.get("loaders", []))
+                ver_num = v.get("version_number", "?")
+                label = f"{ver_num} | MC: {mc} | {loaders}"
+                ver_map[label] = v
+                combo.addItem(label)
+        else:
+            LOADER_NAMES = {1: "Forge", 2: "Cauldron", 3: "LiteLoader", 4: "Fabric", 5: "Quilt", 6: "NeoForge"}
+            for f in versions[:30]:
+                mc = next((v for v in f.get("gameVersions", []) if v[0].isdigit()), "?")
+                loader_name = "?"
+                for sgv in f.get("sortableGameVersions", []):
+                    if sgv.get("gameVersionTypeId") == 2:
+                        gv_name = sgv.get("gameVersionName", "")
+                        loader_name = LOADER_NAMES.get(int(gv_name), gv_name) if gv_name.isdigit() else gv_name
+                dn = f.get("displayName", f.get("fileName", "?"))
+                dlc = f.get("downloadCount", 0)
+                label = f"{mc} | {loader_name} | {dn} ⬇{dlc}"
+                ver_map[label] = f
+                combo.addItem(label)
+        layout.addWidget(QLabel("Выберите версию:"))
+        layout.addWidget(combo)
+        btn = QPushButton("Установить")
+        btn.setStyleSheet("background-color: #4facfe; color: white; border: none; border-radius: 5px; padding: 8px; font-weight: bold;")
+        layout.addWidget(btn)
+        result = [None]
+        def on_install():
+            result[0] = ver_map[combo.currentText()]
+            dialog.accept()
+        btn.clicked.connect(on_install)
+        dialog.exec()
+        return result[0]
+
+    def _clean_build_files(self, name):
+        builds_dir = os.path.join(minecraft_directory, "builds", name)
+        manifest_path = os.path.join(builds_dir, "installed_files.json")
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, encoding="utf-8") as f:
+                    files = json.load(f)
+                for fp in files:
+                    if os.path.exists(fp) and fp.startswith(os.path.normpath(minecraft_directory) + os.sep):
+                        try:
+                            os.remove(fp)
+                            print(f"Удалён: {fp}")
+                        except Exception:
+                            pass
+                dirs = sorted(set(os.path.dirname(f) for f in files), key=len, reverse=True)
+                for d in dirs:
+                    if os.path.isdir(d) and d.startswith(os.path.normpath(minecraft_directory) + os.sep):
+                        try:
+                            if not os.listdir(d):
+                                os.rmdir(d)
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"Ошибка очистки старых файлов: {e}")
+
+    def _run_install_with_progress(self, title, install_fn, build_name=None):
+        dialog = QProgressDialog(title, "", 0, 0, self)
+        dialog.setWindowTitle(title)
+        dialog.setCancelButton(None)
+        dialog.setMinimumWidth(350)
+        dialog.show()
+        QApplication.processEvents()
+
+        def prog(val):
+            if dialog.wasCanceled():
+                return
+            dialog.setValue(val)
+            if val > 0:
+                dialog.setMaximum(100)
+                dialog.setValue(val)
+            QApplication.processEvents()
+
+        if build_name:
+            self._clean_build_files(build_name)
+
+        try:
+            name, result = install_fn(prog)
+        except Exception as e:
+            name, result = None, str(e)
+        finally:
+            dialog.close()
+
+        if name:
+            info = result or {}
+            mc_ver = info.get("mc_version", "?")
+            loader = info.get("loader", "?")
+            build_dir = os.path.join(minecraft_directory, "builds", name)
+            self.builds_manager.create_install_config(
+                build_dir,
+                info.get("_source", ""), info.get("_version_id", ""),
+                [mc_ver], [loader])
+            installed = info.get("_installed_files", [])
+            if installed:
+                try:
+                    with open(os.path.join(build_dir, "installed_files.json"), "w", encoding="utf-8") as f:
+                        json.dump(installed, f, ensure_ascii=False, indent=2)
+                except Exception as e:
+                    print(f"Ошибка сохранения манифеста файлов: {e}")
+            conflicted = self.builds_manager.detect_conflicting_mods(minecraft_directory)
+            if conflicted:
+                msg = "⚠️ Найдены конфликтные моды для Sinytra Connector:\n\n"
+                for fn, mid, desc in conflicted:
+                    msg += f"• {fn} ({desc})\n"
+                msg += "\nОни могут вызвать краш при создании мира. Удалить их?"
+                if QMessageBox.warning(self, "Конфликтные моды", msg,
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                    for fn, mid, desc in conflicted:
+                        try:
+                            os.remove(os.path.join(minecraft_directory, "mods", fn))
+                            print(f"Удалён конфликтный мод: {fn}")
+                        except Exception as e:
+                            print(f"Не удалось удалить {fn}: {e}")
+            QMessageBox.information(self, "Готово",
+                f"✅ Сборка '{name}' установлена!\nMinecraft: {mc_ver}\nЗагрузчик: {loader}")
+            if QMessageBox.question(self, "Докачка модов",
+                "Скачать недостающие моды с CurseForge?\n(моды, которые нельзя распространять через Modrinth)",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No) == QMessageBox.StandardButton.Yes:
+                self._run_install_with_progress("Загрузка модов с CurseForge...",
+                    lambda cb: self.builds_manager.download_curseforge_mods_from_modlist(
+                        minecraft_directory, cb, mc_ver=mc_ver, loader_type=loader))
+            # авто-очистка кэша CurseForge (старше 7 дней)
+            import time
+            cache_dir = os.path.join(minecraft_directory, "cache", "curseforge")
+            if os.path.exists(cache_dir):
+                now = time.time()
+                cleaned = 0
+                for fn in os.listdir(cache_dir):
+                    fp = os.path.join(cache_dir, fn)
+                    try:
+                        if os.path.isfile(fp) and now - os.path.getmtime(fp) > 604800:
+                            os.remove(fp)
+                            cleaned += 1
+                    except Exception:
+                        pass
+                if cleaned:
+                    print(f"Автоочистка кэша: удалено {cleaned} устаревших файлов")
+        else:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось установить сборку:\n{result}")
+        self.refresh_installed_builds()
+        self.statusBar().clearMessage()
+
     def install_selected_build(self):
-        """Установка выбранной сборки"""
-        current_item = self.builds_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Предупреждение", "Выберите сборку для установки")
+        item = self.builds_list.currentItem()
+        if not item:
             return
-        
-        build_name = current_item.text()
-        reply = QMessageBox.question(
-            self,
-            "Установка сборки",
-            f"Установить сборку:\n\n{build_name}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.Yes:
-            QMessageBox.information(
-                self,
-                "Установка",
-                f"Начинаем установку сборки:\n\n{build_name}\n\n"
-                "В реальном приложении здесь будет процесс\n"
-                "скачивания и установки сборки."
-            )
-    
+        mp = item.data(Qt.ItemDataRole.UserRole)
+        if not mp:
+            return
+        source = mp.get("source", "modrinth")
+        versions = self.builds_manager.get_modpack_versions(mp["id"], source)
+        selected = self._select_version(versions, source)
+        if not selected:
+            return
+        builds_dir = os.path.join(minecraft_directory, "builds")
+        os.makedirs(builds_dir, exist_ok=True)
+        ok = QMessageBox.question(self, "Установка", f"Установить '{mp['name']}'?",
+                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+        self.statusBar().showMessage(f"Установка {mp['name']}...")
+        self._run_install_with_progress(f"Установка {mp['name']}...",
+            lambda cb: self.builds_manager.download_and_install(selected, source, minecraft_directory, cb),
+            build_name=mp['name'])
+
+    def import_mrpack(self):
+        path, _ = QFileDialog.getOpenFileName(self, "Выберите .mrpack", "", "Modpacks (*.mrpack *.zip)")
+        if not path:
+            return
+        self.statusBar().showMessage("Импорт сборки...")
+        self._run_install_with_progress("Импорт сборки...",
+            lambda cb: self.builds_manager._install_local_mrpack(path, minecraft_directory, cb))
+
     def show_build_info(self):
-        """Показать информацию о сборке"""
-        current_item = self.builds_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Предупреждение", "Выберите сборку для просмотра информации")
+        item = self.builds_list.currentItem()
+        if not item:
             return
-        
-        build_name = current_item.text()
-        QMessageBox.information(
-            self,
-            "Информация о сборке",
-            f"Название: {build_name}\n\n"
-            "Здесь будет подробная информация о сборке:\n"
-            "- Версия Minecraft\n"
-            "- Модификации\n"
-            "- Описание\n"
-            "- Автор\n"
-            "- Рейтинг"
-        )
-    
+        mp = item.data(Qt.ItemDataRole.UserRole)
+        if not mp:
+            return
+        QMessageBox.information(self, "Информация",
+            f"Название: {mp.get('name', '?')}\n"
+            f"Автор: {mp.get('author', '?')}\n"
+            f"Скачиваний: {mp.get('downloads', 0)}\n"
+            f"Источник: {mp.get('source', '?')}\n"
+            f"Описание: {mp.get('description', '?')[:200]}")
+
     def play_installed_build(self):
-        """Запуск установленной сборки"""
-        current_item = self.installed_builds_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Предупреждение", "Выберите сборку для запуска")
+        item = self.installed_builds_list.currentItem()
+        if not item:
             return
-        
-        build_name = current_item.text()
-        QMessageBox.information(
-            self,
-            "Запуск сборки",
-            f"Запускаем сборку:\n\n{build_name}\n\n"
-            "В реальном приложении здесь будет запуск\n"
-            "Minecraft с выбранной сборкой модов."
-        )
-    
-    def remove_installed_build(self):
-        """Удаление установленной сборки"""
-        current_item = self.installed_builds_list.currentItem()
-        if not current_item:
-            QMessageBox.warning(self, "Предупреждение", "Выберите сборку для удаления")
-            return
-        
-        build_name = current_item.text()
-        reply = QMessageBox.question(
-            self,
-            "Удаление сборки",
-            f"Удалить сборку:\n\n{build_name}?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
+        name = item.text().split(" [")[0]
+        cfg_path = os.path.join(minecraft_directory, "builds", name, "superlauncher_config.json")
+        mc_ver = "?"
+        loader = "vanilla"
+        if os.path.exists(cfg_path):
+            try:
+                with open(cfg_path, encoding="utf-8") as f:
+                    conf = json.load(f)
+                mc_vers = conf.get("mc_versions", [])
+                if mc_vers:
+                    mc_ver = mc_vers[0]
+                loaders = conf.get("loaders", [])
+                if loaders:
+                    loader = loaders[0].lower()
+            except:
+                pass
+
+        minecraft_page = self.pages.widget(10)
+        idx = minecraft_page.version_select.findText(mc_ver)
+        if idx >= 0:
+            minecraft_page.version_select.setCurrentIndex(idx)
+        loader_map = {"forge": "Forge", "fabric": "Fabric", "quilt": "Quilt", "neoforge": "NeoForge", "vanilla": "Vanilla"}
+        loader_name = loader_map.get(loader, "Forge")
+        idx2 = minecraft_page.loader_select.findText(loader_name)
+        if idx2 >= 0:
+            minecraft_page.loader_select.setCurrentIndex(idx2)
+
+        self.pages.setCurrentIndex(9)
+        reply = QMessageBox.question(self, "Запуск",
+            f"Запуск сборки '{name}'\nMinecraft: {mc_ver}  |  Загрузчик: {loader_name}\n\n"
+            f"Версия и загрузчик уже выбраны на странице Minecraft.\nЗапустить сейчас?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         if reply == QMessageBox.StandardButton.Yes:
-            QMessageBox.information(
-                self,
-                "Удаление",
-                f"Сборка '{build_name}' будет удалена.\n\n"
-                "В реальном приложении здесь будет процесс\n"
-                "удаления файлов сборки."
-            )
+            self.launch_game()
+
+    def remove_installed_build(self):
+        item = self.installed_builds_list.currentItem()
+        if not item:
+            return
+        ok = QMessageBox.question(self, "Удаление", f"Удалить '{item.text()}'?\nВсе файлы сборки в .minecraft будут удалены.",
+                                   QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+        builds_dir = os.path.join(minecraft_directory, "builds")
+        name = item.text().split(" [")[0]
+        self._clean_build_files(name)
+        target = os.path.join(builds_dir, name)
+        if os.path.exists(target):
+            import shutil
+            shutil.rmtree(target, ignore_errors=True)
+        self.builds_manager.restore_mods(minecraft_directory)
+        self.refresh_installed_builds()
+    
+    def restore_mods_backup(self):
+        ok = self.builds_manager.restore_mods(minecraft_directory)
+        if ok:
+            QMessageBox.information(self, "Готово", "Моды восстановлены из резервной копии.")
+        else:
+            QMessageBox.information(self, "Восстановление", "Резервной копии модов не найдено.")
+    
+    def download_missing_cf_mods(self):
+        item = self.installed_builds_list.currentItem()
+        mc_ver = None
+        loader = "forge"
+        if item:
+            name = item.text().split(" [")[0]
+            cfg_path = os.path.join(minecraft_directory, "builds", name, "superlauncher_config.json")
+            if os.path.exists(cfg_path):
+                try:
+                    with open(cfg_path, encoding="utf-8") as f:
+                        conf = json.load(f)
+                    mc_vers = conf.get("mc_versions", [])
+                    if mc_vers:
+                        mc_ver = mc_vers[0]
+                    loaders = conf.get("loaders", [])
+                    if loaders:
+                        loader = loaders[0].lower()
+                except Exception:
+                    pass
+        self.statusBar().showMessage("Загрузка недостающих модов с CurseForge...")
+        self._run_install_with_progress("Загрузка модов с CurseForge...",
+            lambda cb: self.builds_manager.download_curseforge_mods_from_modlist(
+                minecraft_directory, cb, mc_ver=mc_ver, loader_type=loader))
+    
+    def clear_builds_cache(self):
+        cache_dir = os.path.join(minecraft_directory, "cache")
+        if not os.path.exists(cache_dir):
+            QMessageBox.information(self, "Кэш", "Кэш пуст.")
+            return
+        import shutil
+        try:
+            total = 0
+            for root, dirs, files in os.walk(cache_dir):
+                total += len(files)
+            ok = QMessageBox.question(self, "Очистка кэша",
+                f"Удалить {total} файлов из кэша?\nВсе скачанные моды будут загружены заново при следующей докачке.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            if ok != QMessageBox.StandardButton.Yes:
+                return
+            shutil.rmtree(cache_dir, ignore_errors=True)
+            os.makedirs(cache_dir, exist_ok=True)
+            QMessageBox.information(self, "Готово", f"Кэш очищен. Удалено {total} файлов.")
+        except Exception as e:
+            QMessageBox.critical(self, "Ошибка", f"Не удалось очистить кэш:\n{e}")
     
     def show_help(self):
         """Показать справку"""
@@ -5334,7 +6652,7 @@ class MainWindow(QMainWindow):
             "🔄 Обновления: Обновляйте лаунчер до последней версии\n"
             "🖧 Серверы: Создавайте и управляйте Minecraft-серверами\n"
             "⚙️ Настройки: Настройте лаунчер под себя\n\n"
-            "Поддержка: https://ludvig2457.github.io"
+            "Поддержка: https://github.com/Ludvig2457Ultra/SuperLauncherMC"
         )
     
     def show_stats(self):
@@ -5396,6 +6714,9 @@ class MainWindow(QMainWindow):
             minecraft_page.start_progress.setVisible(running)
             minecraft_page.start_progress_label.setVisible(running)
     
+    def show_launch_error(self, error_msg):
+        QMessageBox.critical(self, "Ошибка запуска", f"Minecraft не запустился:\n{error_msg}")
+
     def apply_settings(self):
         if hasattr(self, "settings_page"):
             theme = self.settings_page.config.get("theme", "dark")
@@ -5403,22 +6724,27 @@ class MainWindow(QMainWindow):
             self.custom_ui.apply_to_widget(self)
     
     def launch_game(self):
-        minecraft_page = self.pages.widget(10)  # Minecraft страница теперь 10
+        minecraft_page = self.pages.widget(10)
         if hasattr(self, "settings_page"):
             config = self.settings_page.config
             version = minecraft_page.version_select.currentText()
             username = minecraft_page.username.text() or "player"
-            
-            # Если пользователь авторизован, используем его имя
+            loader_type = minecraft_page.loader_select.currentText().lower()
+
             if self.account_system.current_user:
                 username = self.account_system.current_user["username"]
-            
+
+            # Передаём настройки в поток запуска
+            self.launch_thread.max_ram = config.get("max_ram", 4096)
+            self.launch_thread.min_ram = max(1024, config.get("max_ram", 4096) // 4)
+            self.launch_thread.java_path = config.get("java_path", "")
+            self.launch_thread.jvm_args = config.get("jvm_args", "")
+
             if config.get("launch_mode") == "java" and config.get("java_path"):
-                java_path = config["java_path"]
-                print(f"Запуск через Java: {java_path}")
-            else:
-                self.launch_thread.launch_setup_signal.emit(version, username)
-                self.launch_thread.start()
+                self.launch_thread.java_path = config["java_path"]
+
+            self.launch_thread.launch_setup_signal.emit(version, username, loader_type)
+            self.launch_thread.start()
     
     def closeEvent(self, event):
         if hasattr(self, "discord_rpc_thread") and self.discord_rpc_thread:
