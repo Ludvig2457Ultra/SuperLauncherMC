@@ -17,7 +17,7 @@
 ## 2. Клонируйте свой форк
 
 ```bash
-git clone https://github.com/ВАШ_ЛОГИН/SuperLauncherMC.git
+git clone https://github.com/Ludvig2457Ultra/SuperLauncherMC.git
 cd SuperLauncherMC
 ```
 
