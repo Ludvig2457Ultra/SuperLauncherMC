@@ -26,7 +26,7 @@ cd SuperLauncherMC
 ## 3. Добавьте оригинальный репозиторий
 
 ```bash
-git remote add upstream https://github.com/Ludvig2457/SuperLauncherMC.git
+git remote add upstream https://github.com/Ludvig2457Ultra/SuperLauncherMC.git
 ```
 
 Проверьте:
