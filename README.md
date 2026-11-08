@@ -1,70 +1,71 @@
-# SuperLauncher
+# SuperLauncherMC
 
-🎮 Lightweight and fast Minecraft launcher with automatic updates to the latest versions.
+🎮 A lightweight, telemetry-free Minecraft launcher for Arch Linux (and beyond).
 
----
+**No ads. No tracking. No Electron. Just PyQt6 and ~150 MB of RAM.**
 
-## 🚀 Features
+> "We don’t make software. We make statements."
 
-- Supports the latest Minecraft version (at release — 1.21.8)  
-- Automatic updates for both launcher and Minecraft when new versions are released by Mojang  
-- Ability to create and manage your own local Minecraft servers directly from the launcher  
-- Server management panel with EULA settings, online/offline mode, and start/stop controls  
-- Add any servers to the list for quick connection  
-- Manual download and management of Minecraft versions (in the `versions` folder)  
-- Ability to manually download and use Fabric, Forge, and OptiFine mods  
-- Does not require Java installation — Minecraft and servers run using the `minecraft-launcher-lib` library  
-- Simple and minimalist interface  
+![SuperLauncherMC screenshot](assets/screenshot.png)
 
----
+## Install (Arch Linux)
 
-## 📁 Included
+You can grab the package straight from the Arch User Repository (AUR):
 
-- `super_launcher.exe` — executable launcher file  
-- `assets/title.png` — launcher icon/logo  
+```bash
+yay -S superlauncher
+# or
+paru -S superlauncher
+```
 
----
+### Other Distributions
+Clone the repo and run it directly via Python (Requires Python 3.10+ and PyQt6):
+```bash
+git clone https://github.com
+cd SuperLauncherMC-for-linux
+pip install -r requirements.txt
+python -m superlauncher
+```
 
-## 🔧 Technologies
+## Why?
+Most Minecraft launchers today are absolute trash:
+* **Bloated Electron apps** (Lunar, Feather) that hog your system resources.
+* **Packed with malware and telemetry** (TLauncher) that track your background data.
+* **Overcomplicated setups** that force you into manual Java path configurations.
 
-- Language: Python 3.x  
-- Compiled with: PyInstaller  
-- Minecraft and server launching via [`minecraft-launcher-lib`](https://github.com/TechnicPack/MinecraftLauncherLib)  
+SuperLauncherMC is different. It's built independently from the ground up to be blazing fast, entirely local, and resource-friendly. It starts in ~0.5s, uses roughly 150 MB of RAM, and strips out corporate tracking. It also builds full-stack dev tools right into your client, allowing you to manage local environments directly from the interface.
 
----
+## Features
+✅ **Zero Telemetry, Zero Ads** — Completely isolated workspace. No trackers, no analytics, no corporate call-backs.
 
-## 📥 How to use
+✅ **Native Local Server Orchestration** — Deploy, configure, and manage local Minecraft servers (Paper, Spigot, Forge, Fabric) straight from the GUI. Features automated EULA acceptance, console piping, backups, and MOTD configuration.
 
-1. Download the `super_launcher.exe` file from the [releases](https://github.com/ludvig2457/SuperLauncher/releases) section  
-2. Run the file by double-clicking  
-3. The launcher will automatically download the latest Minecraft version and start the game  
-4. Use the built-in control panel to create and manage servers  
-5. If needed, manually download Minecraft versions and Fabric, Forge, OptiFine mods by placing them in the appropriate folders  
-6. Enjoy playing without complicated setup and hassle!
+✅ **Modrinth & CurseForge Integration** — Direct API integration for clean, one-click mod and modpack installation.
 
----
+✅ **Full Environment Support** — Out-of-the-box launcher support for Vanilla, Fabric, Forge, Quilt, and OptiFine.
 
-## 🆕 What’s new in version 1.4.0.5
+✅ **Account Management** — Secure Microsoft OAuth implementation alongside fully functional offline accounts.
 
-- ✅ Integration with Modrinth API for downloading and managing mods directly from the launcher  
-- 🎨 Added support for light and dark UI themes  
-- ⚙️ New Minecraft launch method option: by default uses `minecraft-launcher-lib`, optionally you can specify a path to installed Java  
-- 🐞 Fixed minor bugs and improved stability  
+✅ **Client & Asset Automation** — Native auto-updates pipeline for both the launcher core and Minecraft runtimes.
 
----
+## What's still rough
+* **Arch-First Packaging:** The launcher is primarily optimized and engineered on Arch Linux. It works on other distros via Python interpreter scripts, but the seamless packaging is Arch-focused.
+* **Brutal UI:** The interface is built to be purely functional and lightweight, not fancy. Startup metrics and memory restrictions were prioritized over smooth UI animations.
+* **Distribution Formats:** Flatpak and AppImage wrappers are not implemented yet. They are planned for future deployment cycles.
+* **Localization:** The runtime language switch framework (RU ↔ EN) currently has a known bug. A hotfix is actively in progress.
 
-## ❌ Limitations
+## Tech Stack
+* Python 3.10+ / PyQt6
+* `minecraft-launcher-lib` for instance environments execution
+* Upstream AUR Package: `superlauncher`
 
-- Automatic support for Fabric, Forge, and OptiFine mods is not yet implemented — they must be downloaded and installed manually  
-- Minecraft and servers are launched via `minecraft-launcher-lib`, so external Java installation is not required  
+## Contributing
+Issues and pull requests are highly welcome. If you encounter a runtime crash or process hanging, please open an issue containing:
+1. Your Linux distribution and system Python interpreter version.
+2. The current launcher build version.
+3. Accurate terminal logs or steps to reproduce the bug.
 
----
+## License
+Distributed under the **GPL-3.0 License**. 
 
-## 🌟 Author
-
-**Ludvig2457** — [GitHub profile](https://github.com/ludvig2457)
-
----
-
-Thank you for using SuperLauncher!  
-If you have ideas or find bugs, please create an issue or submit a PR.
+Developed by **Ludvig2457** · GitHub Organization: [SuperLauncherMC](https://github.com)
